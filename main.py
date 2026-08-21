@@ -16,4 +16,29 @@ token = os.getenv("DISCORD_TOKEN")
 #                       CLIENT DISCORD                  #
 #-------------------------------------------------------#
 
+# configuración sobre qué categorías de eventos recibiremos.
 intents=discord.Intents.default()
+
+#cliente que utilizará esa configuración para manejar conexión con Discord.
+client = discord.Client(intents=intents)
+
+
+#   -------------------------------------------------------#
+#                     EVENTOS DEL CLIENTE                  #
+#   -------------------------------------------------------#
+
+def online():
+    print("Bot ready for use")
+    
+
+@client.event
+async def on_ready():
+    online()
+    
+    
+    
+#   -------------------------------------------------------#
+#                    CONEXIÓN CON DISCORD                  #
+#   -------------------------------------------------------#
+
+client.run(token)  # inicia la conexión con Discord
