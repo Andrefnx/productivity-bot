@@ -1,2 +1,1 @@
-print('Productivity Discord Bot')
-print('Starting...')
+from dotenv import load_dotenv
