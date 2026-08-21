@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 import os
 import discord
+from discord import app_commands
 
 
 #-------------------------------------------------------#
@@ -22,18 +23,17 @@ intents=discord.Intents.default()
 #cliente que utilizará esa configuración para manejar conexión con Discord.
 client = discord.Client(intents=intents)
 
-
 #   -------------------------------------------------------#
-#                     EVENTOS DEL CLIENTE                  #
+#                          COMANDOS                        #
 #   -------------------------------------------------------#
 
-def online():
-    print("Bot ready for use")
-    
+tree = app_commands.CommandTree(client)
 
-@client.event
-async def on_ready():
-    online()
+@tree.command(name="ping", description="Initial message'")  # comando de barra
+async def ping(interaction: discord.Interaction):
+    await interaction.response.send_message(
+        "I'm the grandmaster of Gusu Lan"
+    ) # respuesta al comando    
     
     
     
@@ -41,4 +41,20 @@ async def on_ready():
 #                    CONEXIÓN CON DISCORD                  #
 #   -------------------------------------------------------#
 
-client.run(token)  # inicia la conexión con Discord
+@client.event
+async def on_ready():
+    guild = discord.Object(id=1540358191387513034)
+
+    tree.copy_global_to(guild=guild)
+    synced = await tree.sync(guild=guild)
+
+    global_commands = await tree.fetch_commands()
+    guild_commands = await tree.fetch_commands(guild=guild)
+
+    print("GLOBAL:", [command.name for command in global_commands])
+    print("GUILD:", [command.name for command in guild_commands])
+
+    print(f"Synced commands: {len(synced)}")
+    print("Bot ready for use")
+
+client.run(token)
