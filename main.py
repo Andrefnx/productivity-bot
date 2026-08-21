@@ -4,24 +4,16 @@ import discord
 from discord import app_commands
 
 
-#-------------------------------------------------------#
-#              LOAD ENVIRONMENT VARIABLES               #
-#-------------------------------------------------------#
-
-load_dotenv()  # reads variables from a .env file and sets them in os.environ
-
+# reads variables from a .env file and sets them in os.environ
+load_dotenv()  
 #Carga de token, conexión con la API de Discord
-token = os.getenv("DISCORD_TOKEN")
-
-#-------------------------------------------------------#
-#                       CLIENT DISCORD                  #
-#-------------------------------------------------------#
-
+token = os.getenv("DISCORD_TOKEN")  
 # configuración sobre qué categorías de eventos recibiremos.
 intents=discord.Intents.default()
-
 #cliente que utilizará esa configuración para manejar conexión con Discord.
 client = discord.Client(intents=intents)
+
+
 
 #   -------------------------------------------------------#
 #                          COMANDOS                        #
@@ -37,6 +29,8 @@ async def ping(interaction: discord.Interaction):
     
     
     
+    
+    
 #   -------------------------------------------------------#
 #                    CONEXIÓN CON DISCORD                  #
 #   -------------------------------------------------------#
@@ -47,12 +41,6 @@ async def on_ready():
 
     tree.copy_global_to(guild=guild)
     synced = await tree.sync(guild=guild)
-
-    global_commands = await tree.fetch_commands()
-    guild_commands = await tree.fetch_commands(guild=guild)
-
-    print("GLOBAL:", [command.name for command in global_commands])
-    print("GUILD:", [command.name for command in guild_commands])
 
     print(f"Synced commands: {len(synced)}")
     print("Bot ready for use")
