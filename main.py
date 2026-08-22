@@ -32,13 +32,60 @@ async def ping(interaction: discord.Interaction):
 
 @tree.command(name="sprint", description="Start a writing sprint")  # comando de barra
 async def sprint(interaction: discord.Interaction):
+    view = SprintView()
     await interaction.response.send_message(
-        "Sprint menu coming soon!"
+        "A writing sprint has started!",
+        view=view
     ) 
     
     
-    
-    
+#view for the sprint command
+class SprintView(discord.ui.View):
+
+    @discord.ui.button(label="Join")
+    async def join(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await interaction.response.send_message(
+            "You joined the sprint!",
+            ephemeral=True
+        )
+
+    @discord.ui.button(label="Leave")
+    async def leave(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await interaction.response.send_message(
+            "You left the sprint!",
+            ephemeral=True
+        )
+
+    @discord.ui.button(label="Change Sprint Time")
+    async def change_sprint_time(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await interaction.response.send_message(
+            "You changed the sprint time!",
+            ephemeral=True
+        )
+
+    @discord.ui.button(label="Change Projects")
+    async def change_projects(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await interaction.response.send_message(
+            "You changed projects!",
+            ephemeral=True
+        )
+
 #   -------------------------------------------------------#
 #                    CONEXIÓN CON DISCORD                  #
 #   -------------------------------------------------------#
