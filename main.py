@@ -21,12 +21,20 @@ client = discord.Client(intents=intents)
 
 tree = app_commands.CommandTree(client)
 
-@tree.command(name="ping", description="Initial message'")  # comando de barra
+@tree.command(name="ping", description="Initial message")  # comando de barra
 async def ping(interaction: discord.Interaction):
     await interaction.response.send_message(
-        "I'm the grandmaster of Gusu Lan"
-    ) # respuesta al comando    
+        "What are you doing? Shouldn't you be working?"
+    )    
     
+    
+#---------------------------SPRINT---------------------------#
+
+@tree.command(name="sprint", description="Start a writing sprint")  # comando de barra
+async def sprint(interaction: discord.Interaction):
+    await interaction.response.send_message(
+        "Sprint menu coming soon!"
+    ) 
     
     
     
@@ -37,11 +45,14 @@ async def ping(interaction: discord.Interaction):
 
 @client.event
 async def on_ready():
-    guild = discord.Object(id=1540358191387513034)
+    test_server = discord.Object(id=1540358191387513034)
 
-    tree.copy_global_to(guild=guild)
-    synced = await tree.sync(guild=guild)
+    tree.copy_global_to(guild=test_server)
+    synced = await tree.sync(guild=test_server)
 
+    remote_commands = await tree.fetch_commands(guild=test_server)
+
+    print("REMOTE GUILD:", [command.name for command in remote_commands])
     print(f"Synced commands: {len(synced)}")
     print("Bot ready for use")
 
