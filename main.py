@@ -28,23 +28,13 @@ tree = app_commands.CommandTree(client)
 # -------------------------------------------------------
 
 @tree.command(
-    name="ping",
-    description="Check if the bot is responding"
-)
-async def ping(interaction: discord.Interaction):
-    await interaction.response.send_message(
-        "What are you doing? Shouldn't you be working?"
-    )
-
-
-@tree.command(
     name="sprint",
     description="Start a writing sprint"
 )
 async def sprint(interaction: discord.Interaction):
-    modal = SprintCreateModal()
+    sprintModal = SprintCreateModal()
 
-    await interaction.response.send_modal(modal)
+    await interaction.response.send_modal(sprintModal)
 
 
 # -------------------------------------------------------
