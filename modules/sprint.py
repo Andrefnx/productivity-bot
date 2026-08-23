@@ -366,7 +366,7 @@ class SprintTimeModal(discord.ui.Modal):
 class SprintCreateModal(discord.ui.Modal):
     def __init__(self):
         super().__init__(
-            title="Create a Writing Sprint"
+            title="Create a Sprint"
         )
 
         self.duration_input = discord.ui.TextInput(
