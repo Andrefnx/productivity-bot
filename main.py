@@ -44,7 +44,7 @@ async def sprint(interaction: discord.Interaction):
 @client.event
 async def on_ready():
     test_server = discord.Object(
-        id=1540358191387513034
+        id=1540828472413519954
     )
 
     tree.copy_global_to(guild=test_server)
