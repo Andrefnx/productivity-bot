@@ -3,16 +3,36 @@ import time
 
 import discord
 
+from .system_messages import (
+    create_cancelled_embed,
+    create_ended_embed,
+    create_started_embed,
+    create_waiting_embed,
+    register_active_sprint,
+    remove_active_sprint
+)
+
+from .users import SprintParticipants
+
 
 # -------------------------------------------------------
 #                CONFIRMATION VIEW
 # -------------------------------------------------------
 
-class ConfirmationView(discord.ui.View):
-    def __init__(self, confirm_callback):
-        super().__init__(timeout=30)
+class ConfirmationView(
+    discord.ui.View
+):
+    def __init__(
+        self,
+        confirm_callback
+    ):
+        super().__init__(
+            timeout=30
+        )
 
-        self.confirm_callback = confirm_callback
+        self.confirm_callback = (
+            confirm_callback
+        )
 
     @discord.ui.button(
         label="Confirm",
@@ -23,7 +43,10 @@ class ConfirmationView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
-        await self.confirm_callback(interaction)
+        await self.confirm_callback(
+            interaction
+        )
+
         self.stop()
 
     @discord.ui.button(
@@ -47,13 +70,17 @@ class ConfirmationView(discord.ui.View):
 #                    SPRINT VIEW
 # -------------------------------------------------------
 
-class SprintView(discord.ui.View):
+class SprintView(
+    discord.ui.View
+):
     def __init__(
         self,
         duration: int,
         starts_in: int
     ):
-        super().__init__(timeout=None)
+        super().__init__(
+            timeout=None
+        )
 
         self.duration = duration
         self.starts_in = starts_in
@@ -61,65 +88,106 @@ class SprintView(discord.ui.View):
         self.message = None
         self.sprint_timer = None
 
-    async def run_sprint(self):
-        # WAITING -> STARTED
-        await asyncio.sleep(self.starts_in * 60)
+        self.participants = SprintParticipants()
 
-        end_timestamp = int(
-            time.time() + self.duration * 60
+        self.start_timestamp = int(
+            time.time()
+            + starts_in * 60
         )
 
-        started_embed = discord.Embed(
-            title="Sprint started!",
-            description=(
-                f"Time to focus!\n"
-                f"Sprint ends <t:{end_timestamp}:R>."
-            )
-        )
+        self.started = False
 
-        started_embed.add_field(
-            name="Duration",
-            value=f"{self.duration} minutes",
-            inline=True
-        )
 
-        started_embed.add_field(
-            name="Participants",
-            value="0",
-            inline=False
+# -------------------------------------------------------
+#                  SPRINT MESSAGE
+# -------------------------------------------------------
+
+    async def update_waiting_message(
+        self,
+        updated: bool = False
+    ):
+        waiting_embed = create_waiting_embed(
+            duration=self.duration,
+            start_timestamp=self.start_timestamp,
+            participants_text=(
+                self.participants.get_mentions_text()
+            ),
+            updated=updated
         )
 
         await self.message.edit(
-            embed=started_embed,
+            embed=waiting_embed,
             view=self
         )
 
-        # STARTED -> ENDED
-        await asyncio.sleep(self.duration * 60)
 
-        ended_embed = discord.Embed(
-            title="Sprint ended!",
-            description="Time is up!"
-        )
+# -------------------------------------------------------
+#                   SPRINT TIMER
+# -------------------------------------------------------
 
-        ended_embed.add_field(
-            name="Duration",
-            value=f"{self.duration} minutes",
-            inline=True
-        )
+    async def run_sprint(
+        self
+    ):
+        try:
+            await asyncio.sleep(
+                self.starts_in * 60
+            )
 
-        ended_embed.add_field(
-            name="Participants who finished",
-            value="0",
-            inline=False
-        )
+            self.started = True
 
-        await self.message.edit(
-            embed=ended_embed,
-            view=None
-        )
+            end_timestamp = int(
+                time.time()
+                + self.duration * 60
+            )
 
-        self.stop()
+            started_embed = create_started_embed(
+                duration=self.duration,
+                end_timestamp=end_timestamp,
+                participants_text=(
+                    self.participants.get_mentions_text()
+                )
+            )
+
+            start_ping = (
+                self.participants.get_start_ping()
+            )
+
+            await self.message.edit(
+                content=start_ping,
+                embed=started_embed,
+                view=self
+            )
+
+            await asyncio.sleep(
+                self.duration * 60
+            )
+
+            ended_embed = create_ended_embed(
+                duration=self.duration,
+                participants_text=(
+                    self.participants.get_mentions_text()
+                )
+            )
+
+            await self.message.edit(
+                content=None,
+                embed=ended_embed,
+                view=None
+            )
+
+            remove_active_sprint(
+                self.message.id
+            )
+
+            self.stop()
+
+        except asyncio.CancelledError:
+            raise
+
+
+# -------------------------------------------------------
+#                  RESTART TIMER
+# -------------------------------------------------------
 
     async def restart_timer(
         self,
@@ -132,44 +200,25 @@ class SprintView(discord.ui.View):
         self.duration = duration
         self.starts_in = starts_in
 
-        start_timestamp = int(
-            time.time() + starts_in * 60
+        self.start_timestamp = int(
+            time.time()
+            + starts_in * 60
         )
 
-        waiting_embed = discord.Embed(
-            title="Productivity time!",
-            description=(
-                "Sprint time has been updated.\n"
-                "Use the buttons below to join or modify the sprint."
-            )
-        )
+        self.started = False
 
-        waiting_embed.add_field(
-            name="Duration",
-            value=f"{duration} minutes",
-            inline=True
-        )
-
-        waiting_embed.add_field(
-            name="Starts",
-            value=f"<t:{start_timestamp}:R>",
-            inline=True
-        )
-
-        waiting_embed.add_field(
-            name="Participants",
-            value="0",
-            inline=False
-        )
-
-        await self.message.edit(
-            embed=waiting_embed,
-            view=self
+        await self.update_waiting_message(
+            updated=True
         )
 
         self.sprint_timer = asyncio.create_task(
             self.run_sprint()
         )
+
+
+# -------------------------------------------------------
+#                   CANCEL SPRINT
+# -------------------------------------------------------
 
     async def confirm_cancel(
         self,
@@ -178,18 +227,19 @@ class SprintView(discord.ui.View):
         if self.sprint_timer is not None:
             self.sprint_timer.cancel()
 
-        cancelled_embed = discord.Embed(
-            title="Sprint cancelled",
-            description=(
-                f"The sprint was cancelled by "
-                f"{interaction.user.mention}."
-            )
+        cancelled_embed = create_cancelled_embed(
+            user_mention=interaction.user.mention
         )
 
         if self.message is not None:
             await self.message.edit(
+                content=None,
                 embed=cancelled_embed,
                 view=None
+            )
+
+            remove_active_sprint(
+                self.message.id
             )
 
         await interaction.response.edit_message(
@@ -198,6 +248,11 @@ class SprintView(discord.ui.View):
         )
 
         self.stop()
+
+
+# -------------------------------------------------------
+#                      JOIN
+# -------------------------------------------------------
 
     @discord.ui.button(
         label="Join",
@@ -209,10 +264,37 @@ class SprintView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
+        if self.started:
+            await interaction.response.send_message(
+                "This sprint has already started.",
+                ephemeral=True
+            )
+
+            return
+
+        added = self.participants.add_user(
+            interaction.user
+        )
+
+        if not added:
+            await interaction.response.send_message(
+                "You are already in this sprint.",
+                ephemeral=True
+            )
+
+            return
+
         await interaction.response.send_message(
             "You joined the sprint!",
             ephemeral=True
         )
+
+        await self.update_waiting_message()
+
+
+# -------------------------------------------------------
+#                      LEAVE
+# -------------------------------------------------------
 
     @discord.ui.button(
         label="Leave",
@@ -224,10 +306,37 @@ class SprintView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
+        if self.started:
+            await interaction.response.send_message(
+                "This sprint has already started.",
+                ephemeral=True
+            )
+
+            return
+
+        removed = self.participants.remove_user(
+            interaction.user.id
+        )
+
+        if not removed:
+            await interaction.response.send_message(
+                "You are not in this sprint.",
+                ephemeral=True
+            )
+
+            return
+
         await interaction.response.send_message(
             "You left the sprint!",
             ephemeral=True
         )
+
+        await self.update_waiting_message()
+
+
+# -------------------------------------------------------
+#                  CANCEL BUTTON
+# -------------------------------------------------------
 
     @discord.ui.button(
         label="Cancel Sprint",
@@ -249,6 +358,11 @@ class SprintView(discord.ui.View):
             ephemeral=True
         )
 
+
+# -------------------------------------------------------
+#                CHANGE SPRINT TIME
+# -------------------------------------------------------
+
     @discord.ui.button(
         label="Change Sprint Time",
         style=discord.ButtonStyle.secondary,
@@ -259,11 +373,26 @@ class SprintView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
-        modal = SprintTimeModal(self)
+        if self.started:
+            await interaction.response.send_message(
+                "This sprint has already started.",
+                ephemeral=True
+            )
+
+            return
+
+        modal = SprintTimeModal(
+            self
+        )
 
         await interaction.response.send_modal(
             modal
         )
+
+
+# -------------------------------------------------------
+#                 SPRINT ACTIVITY
+# -------------------------------------------------------
 
     @discord.ui.button(
         label="Edit Sprint Activity",
@@ -285,7 +414,9 @@ class SprintView(discord.ui.View):
 #                 CHANGE SPRINT TIME MODAL
 # -------------------------------------------------------
 
-class SprintTimeModal(discord.ui.Modal):
+class SprintTimeModal(
+    discord.ui.Modal
+):
     def __init__(
         self,
         sprint_view: SprintView
@@ -298,7 +429,9 @@ class SprintTimeModal(discord.ui.Modal):
 
         self.duration_input = discord.ui.TextInput(
             label="Duration (minutes)",
-            default=str(sprint_view.duration),
+            default=str(
+                sprint_view.duration
+            ),
             style=discord.TextStyle.short,
             required=True,
             max_length=3
@@ -306,7 +439,9 @@ class SprintTimeModal(discord.ui.Modal):
 
         self.starts_in_input = discord.ui.TextInput(
             label="Starts in (minutes)",
-            default=str(sprint_view.starts_in),
+            default=str(
+                sprint_view.starts_in
+            ),
             style=discord.TextStyle.short,
             required=True,
             max_length=3
@@ -338,14 +473,18 @@ class SprintTimeModal(discord.ui.Modal):
                 "Duration and start time must be numbers.",
                 ephemeral=True
             )
+
             return
 
-        if duration <= 0 or starts_in < 0:
+        if (
+            duration <= 0
+            or starts_in < 0
+        ):
             await interaction.response.send_message(
-                "Duration must be greater than 0, "
-                "and start time cannot be negative.",
+                "Duration must be greater than 0, and start time cannot be negative.",
                 ephemeral=True
             )
+
             return
 
         await interaction.response.send_message(
@@ -363,8 +502,12 @@ class SprintTimeModal(discord.ui.Modal):
 #                  SPRINT CREATE MODAL
 # -------------------------------------------------------
 
-class SprintCreateModal(discord.ui.Modal):
-    def __init__(self):
+class SprintCreateModal(
+    discord.ui.Modal
+):
+    def __init__(
+        self
+    ):
         super().__init__(
             title="Create a Sprint"
         )
@@ -403,7 +546,9 @@ class SprintCreateModal(discord.ui.Modal):
             )
 
             starts_in = (
-                int(self.starts_in_input.value)
+                int(
+                    self.starts_in_input.value
+                )
                 if self.starts_in_input.value
                 else 0
             )
@@ -413,44 +558,28 @@ class SprintCreateModal(discord.ui.Modal):
                 "Duration and start time must be numbers.",
                 ephemeral=True
             )
+
             return
 
-        if duration <= 0 or starts_in < 0:
+        if (
+            duration <= 0
+            or starts_in < 0
+        ):
             await interaction.response.send_message(
-                "Duration must be greater than 0, "
-                "and start time cannot be negative.",
+                "Duration must be greater than 0, and start time cannot be negative.",
                 ephemeral=True
             )
+
             return
 
         start_timestamp = int(
-            time.time() + starts_in * 60
+            time.time()
+            + starts_in * 60
         )
 
-        waiting_embed = discord.Embed(
-            title="Productivity time!",
-            description=(
-                "Use the buttons below to join "
-                "or modify the sprint."
-            )
-        )
-
-        waiting_embed.add_field(
-            name="Duration",
-            value=f"{duration} minutes",
-            inline=True
-        )
-
-        waiting_embed.add_field(
-            name="Starts",
-            value=f"<t:{start_timestamp}:R>",
-            inline=True
-        )
-
-        waiting_embed.add_field(
-            name="Participants",
-            value="0",
-            inline=False
+        waiting_embed = create_waiting_embed(
+            duration=duration,
+            start_timestamp=start_timestamp
         )
 
         view = SprintView(
@@ -467,6 +596,12 @@ class SprintCreateModal(discord.ui.Modal):
 
         view.message = message
 
+        register_active_sprint(
+            guild_id=interaction.guild_id,
+            channel_id=interaction.channel_id,
+            message_id=message.id
+        )
+
         view.sprint_timer = asyncio.create_task(
             view.run_sprint()
         )
@@ -476,5 +611,10 @@ class SprintCreateModal(discord.ui.Modal):
         interaction: discord.Interaction,
         error: Exception
     ):
-        print("ERROR IN SPRINT MODAL:")
-        print(repr(error))
+        print(
+            "ERROR IN SPRINT MODAL:"
+        )
+
+        print(
+            repr(error)
+        )
