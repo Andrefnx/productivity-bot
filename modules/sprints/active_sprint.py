@@ -1,12 +1,41 @@
 import asyncio
 import time
+import uuid
 
 import discord
+
+from .messages import (
+    already_finished_message,
+    already_joined_message,
+    already_started_message,
+    cancel_back_message,
+    cancel_confirmation_message,
+    cancelled_response_message,
+    create_time_invalid_message,
+    duration_invalid_message,
+    ending_soon_message,
+    ending_soon_submessage,
+    force_ended_message,
+    force_ending_message,
+    force_started_message,
+    join_question_message,
+    left_message,
+    no_test_participants_message,
+    not_joined_message,
+    start_first_message,
+    start_message,
+    start_time_invalid_message,
+    time_invalid_message,
+    time_updated_message
+)
+
+from .sprint_activity import (
+    start_results_registration
+)
 
 from .system_messages import (
     create_cancelled_embed,
     create_empty_sprint_embed,
-    create_ended_embed,
     create_started_embed,
     create_waiting_embed,
     register_active_sprint,
@@ -14,8 +43,8 @@ from .system_messages import (
 )
 
 from .users import (
-    SprintParticipants,
-    get_previous_sprint_data
+    JoinSprintView,
+    SprintParticipants
 )
 
 
@@ -34,9 +63,7 @@ class ConfirmationView(
             timeout=30
         )
 
-        self.confirm_callback = (
-            confirm_callback
-        )
+        self.confirm_callback = confirm_callback
 
     @discord.ui.button(
         label="Confirm",
@@ -54,7 +81,7 @@ class ConfirmationView(
         self.stop()
 
     @discord.ui.button(
-        label="Go Back",
+        label="↩️ Go Back",
         style=discord.ButtonStyle.secondary
     )
     async def go_back(
@@ -63,243 +90,11 @@ class ConfirmationView(
         button: discord.ui.Button
     ):
         await interaction.response.edit_message(
-            content="Action cancelled.",
+            content=cancel_back_message,
             view=None
         )
 
         self.stop()
-
-
-class JoinSprintView(
-    discord.ui.View
-):
-    def __init__(
-        self,
-        sprint_view,
-        user_id: int
-    ):
-        super().__init__(
-            timeout=60
-        )
-
-        self.sprint_view = sprint_view
-        self.user_id = user_id
-
-    async def interaction_check(
-        self,
-        interaction: discord.Interaction
-    ):
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message(
-                "This join menu belongs to another user.",
-                ephemeral=True
-            )
-
-            return False
-
-        return True
-
-    @discord.ui.button(
-        label="Enter Details",
-        style=discord.ButtonStyle.primary
-    )
-    async def enter_details(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-        if self.sprint_view.participants.has_user(
-            interaction.user.id
-        ):
-            await interaction.response.send_message(
-                "You are already in this sprint.",
-                ephemeral=True
-            )
-
-            return
-
-        modal = JoinSprintModal(
-            sprint_view=self.sprint_view,
-            user_id=interaction.user.id
-        )
-
-        await interaction.response.send_modal(
-            modal
-        )
-
-    @discord.ui.button(
-        label="Use Previous",
-        style=discord.ButtonStyle.secondary
-    )
-    async def use_previous(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-        if self.sprint_view.participants.has_user(
-            interaction.user.id
-        ):
-            await interaction.response.send_message(
-                "You are already in this sprint.",
-                ephemeral=True
-            )
-
-            return
-
-        previous_data = get_previous_sprint_data(
-            interaction.user.id
-        )
-
-        if previous_data is None:
-            await interaction.response.send_message(
-                "You don't have previous sprint data yet.",
-                ephemeral=True
-            )
-
-            return
-
-        added = self.sprint_view.participants.add_user(
-            user=interaction.user,
-            initial_wc=previous_data.get(
-                "initial_wc"
-            ),
-            project=previous_data.get(
-                "project"
-            )
-        )
-
-        if not added:
-            await interaction.response.send_message(
-                "You are already in this sprint.",
-                ephemeral=True
-            )
-
-            return
-
-        await interaction.response.edit_message(
-            content="You joined the sprint!",
-            view=None
-        )
-
-        await self.sprint_view.update_current_message()
-
-        self.stop()
-
-
-# -------------------------------------------------------
-#                    JOIN MODAL
-# -------------------------------------------------------
-
-class JoinSprintModal(
-    discord.ui.Modal
-):
-    def __init__(
-        self,
-        sprint_view,
-        user_id: int
-    ):
-        super().__init__(
-            title="Join Sprint"
-        )
-
-        self.sprint_view = sprint_view
-        self.user_id = user_id
-
-        self.initial_wc_input = discord.ui.TextInput(
-            label="Initial word count",
-            placeholder="e.g. 1932",
-            style=discord.TextStyle.short,
-            required=False,
-            max_length=10
-        )
-
-        self.project_input = discord.ui.TextInput(
-            label="Project",
-            placeholder="e.g. Big Bang 2026",
-            style=discord.TextStyle.short,
-            required=False,
-            max_length=100
-        )
-
-        self.add_item(
-            self.initial_wc_input
-        )
-
-        self.add_item(
-            self.project_input
-        )
-
-    async def on_submit(
-        self,
-        interaction: discord.Interaction
-    ):
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message(
-                "This join form belongs to another user.",
-                ephemeral=True
-            )
-
-            return
-
-        if self.sprint_view.participants.has_user(
-            interaction.user.id
-        ):
-            await interaction.response.send_message(
-                "You are already in this sprint.",
-                ephemeral=True
-            )
-
-            return
-
-        initial_wc = None
-
-        if self.initial_wc_input.value:
-            try:
-                initial_wc = int(
-                    self.initial_wc_input.value
-                )
-
-            except ValueError:
-                await interaction.response.send_message(
-                    "Word count must be a number.",
-                    ephemeral=True
-                )
-
-                return
-
-            if initial_wc < 0:
-                await interaction.response.send_message(
-                    "Word count cannot be negative.",
-                    ephemeral=True
-                )
-
-                return
-
-        project = (
-            self.project_input.value.strip()
-            or None
-        )
-
-        added = self.sprint_view.participants.add_user(
-            user=interaction.user,
-            initial_wc=initial_wc,
-            project=project
-        )
-
-        if not added:
-            await interaction.response.send_message(
-                "You are already in this sprint.",
-                ephemeral=True
-            )
-
-            return
-
-        await interaction.response.send_message(
-            "You joined the sprint!",
-            ephemeral=True
-        )
-
-        await self.sprint_view.update_current_message()
 
 
 # -------------------------------------------------------
@@ -318,14 +113,18 @@ class SprintView(
             timeout=None
         )
 
+        self.sprint_id = str(
+            uuid.uuid4()
+        )
+
         self.duration = duration
         self.starts_in = starts_in
 
         self.message = None
         self.sprint_timer = None
 
-        self.participants = (
-            SprintParticipants()
+        self.participants = SprintParticipants(
+            sprint_id=self.sprint_id
         )
 
         self.start_timestamp = int(
@@ -334,8 +133,9 @@ class SprintView(
         )
 
         self.end_timestamp = None
-        self.started = False
 
+        self.started = False
+        self.finished = False
 
 
 # -------------------------------------------------------
@@ -391,6 +191,9 @@ class SprintView(
     async def update_current_message(
         self
     ):
+        if self.finished:
+            return
+
         if self.started:
             await self.update_started_message()
 
@@ -405,18 +208,16 @@ class SprintView(
     async def send_start_notification(
         self
     ):
-        start_ping = (
-            self.participants.get_start_ping()
-        )
+        mentions = self.participants.get_ping_text()
 
-        if not start_ping:
-            return False
+        if not mentions:
+            return
 
         try:
             await self.message.channel.send(
                 content=(
-                    f"{start_ping}\n"
-                    "Sprint started!"
+                    f"{mentions}\n"
+                    f"{start_message}"
                 ),
                 allowed_mentions=discord.AllowedMentions(
                     everyone=False,
@@ -424,8 +225,6 @@ class SprintView(
                     roles=False
                 )
             )
-
-            return True
 
         except (
             discord.Forbidden,
@@ -439,7 +238,69 @@ class SprintView(
                 repr(error)
             )
 
-            return False
+
+# -------------------------------------------------------
+#                ENDING NOTIFICATION
+# -------------------------------------------------------
+
+    async def send_ending_notification(
+        self
+    ):
+        mentions = self.participants.get_ping_text()
+
+        if not mentions:
+            return
+
+        try:
+            await self.message.channel.send(
+                content=(
+                    f"{mentions}\n"
+                    f"{ending_soon_message}\n"
+                    f"{ending_soon_submessage}"
+                ),
+                allowed_mentions=discord.AllowedMentions(
+                    everyone=False,
+                    users=True,
+                    roles=False
+                )
+            )
+
+        except (
+            discord.Forbidden,
+            discord.HTTPException
+        ) as error:
+            print(
+                "ENDING NOTIFICATION ERROR:"
+            )
+
+            print(
+                repr(error)
+            )
+
+
+# -------------------------------------------------------
+#                   START SPRINT
+# -------------------------------------------------------
+
+    async def start_sprint(
+        self
+    ):
+        if self.started:
+            return
+
+        if self.finished:
+            return
+
+        self.started = True
+
+        self.end_timestamp = int(
+            time.time()
+            + self.duration * 60
+        )
+
+        await self.update_started_message()
+
+        await self.send_start_notification()
 
 
 # -------------------------------------------------------
@@ -454,21 +315,12 @@ class SprintView(
                 self.starts_in * 60
             )
 
-            self.started = True
-
-            self.end_timestamp = int(
-                time.time()
-                + self.duration * 60
-            )
-
-            await self.update_started_message()
-
-            await self.send_start_notification()
+            await self.start_sprint()
 
             await self.run_active_timer()
 
         except asyncio.CancelledError:
-            raise
+            return
 
         except Exception as error:
             print(
@@ -504,6 +356,9 @@ class SprintView(
                     empty_timeout
                 )
 
+                if self.finished:
+                    return
+
                 if len(
                     self.participants
                 ) == 0:
@@ -526,10 +381,13 @@ class SprintView(
                     duration_seconds
                 )
 
+            if self.finished:
+                return
+
             await self.finish_sprint()
 
         except asyncio.CancelledError:
-            raise
+            return
 
 
 # -------------------------------------------------------
@@ -539,6 +397,9 @@ class SprintView(
     async def finish_sprint(
         self
     ):
+        if self.finished:
+            return
+
         if len(
             self.participants
         ) == 0:
@@ -546,21 +407,33 @@ class SprintView(
 
             return
 
-        ended_embed = create_ended_embed(
-            duration=self.duration,
-            participants_text=(
-                self.participants.get_mentions_text()
-            )
+        self.finished = True
+
+        finished_participants = (
+            self.participants.snapshot()
         )
 
-        await self.message.edit(
-            content=None,
-            embed=ended_embed,
-            view=None
-        )
+        channel = self.message.channel
+        message_id = self.message.id
 
         remove_active_sprint(
-            self.message.id
+            message_id
+        )
+
+        try:
+            await self.message.delete()
+
+        except (
+            discord.NotFound,
+            discord.Forbidden,
+            discord.HTTPException
+        ):
+            pass
+
+        await start_results_registration(
+            channel=channel,
+            duration=self.duration,
+            participants=finished_participants
         )
 
         self.stop()
@@ -573,9 +446,12 @@ class SprintView(
     async def close_empty_sprint(
         self
     ):
-        empty_embed = (
-            create_empty_sprint_embed()
-        )
+        if self.finished:
+            return
+
+        self.finished = True
+
+        empty_embed = create_empty_sprint_embed()
 
         await self.message.edit(
             content=None,
@@ -612,15 +488,14 @@ class SprintView(
 
         self.end_timestamp = None
         self.started = False
+        self.finished = False
 
         await self.update_waiting_message(
             updated=True
         )
 
-        self.sprint_timer = (
-            asyncio.create_task(
-                self.run_sprint()
-            )
+        self.sprint_timer = asyncio.create_task(
+            self.run_sprint()
         )
 
 
@@ -644,10 +519,8 @@ class SprintView(
 
         await self.update_started_message()
 
-        self.sprint_timer = (
-            asyncio.create_task(
-                self.run_active_timer()
-            )
+        self.sprint_timer = asyncio.create_task(
+            self.run_active_timer()
         )
 
 
@@ -662,12 +535,10 @@ class SprintView(
         if self.sprint_timer is not None:
             self.sprint_timer.cancel()
 
-        cancelled_embed = (
-            create_cancelled_embed(
-                user_mention=(
-                    interaction.user.mention
-                )
-            )
+        self.finished = True
+
+        cancelled_embed = create_cancelled_embed(
+            user_mention=interaction.user.mention
         )
 
         if self.message is not None:
@@ -682,7 +553,7 @@ class SprintView(
             )
 
         await interaction.response.edit_message(
-            content="Sprint cancelled.",
+            content=cancelled_response_message,
             view=None
         )
 
@@ -703,11 +574,19 @@ class SprintView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
+        if self.finished:
+            await interaction.response.send_message(
+                already_finished_message,
+                ephemeral=True
+            )
+
+            return
+
         if self.participants.has_user(
             interaction.user.id
         ):
             await interaction.response.send_message(
-                "You are already in this sprint.",
+                already_joined_message,
                 ephemeral=True
             )
 
@@ -719,7 +598,7 @@ class SprintView(
         )
 
         await interaction.response.send_message(
-            "How do you want to join?",
+            join_question_message,
             view=join_view,
             ephemeral=True
         )
@@ -739,22 +618,28 @@ class SprintView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
-        removed = (
-            self.participants.remove_user(
-                interaction.user.id
+        if self.finished:
+            await interaction.response.send_message(
+                already_finished_message,
+                ephemeral=True
             )
+
+            return
+
+        removed = self.participants.remove_user(
+            interaction.user.id
         )
 
         if not removed:
             await interaction.response.send_message(
-                "You are not in this sprint.",
+                not_joined_message,
                 ephemeral=True
             )
 
             return
 
         await interaction.response.send_message(
-            "You left the sprint!",
+            left_message,
             ephemeral=True
         )
 
@@ -775,16 +660,12 @@ class SprintView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
-        confirmation_view = (
-            ConfirmationView(
-                confirm_callback=(
-                    self.confirm_cancel
-                )
-            )
+        confirmation_view = ConfirmationView(
+            confirm_callback=self.confirm_cancel
         )
 
         await interaction.response.send_message(
-            "Are you sure you want to cancel this sprint?",
+            cancel_confirmation_message,
             view=confirmation_view,
             ephemeral=True
         )
@@ -804,6 +685,14 @@ class SprintView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
+        if self.finished:
+            await interaction.response.send_message(
+                already_finished_message,
+                ephemeral=True
+            )
+
+            return
+
         modal = SprintTimeModal(
             self
         )
@@ -814,44 +703,30 @@ class SprintView(
 
 
 # -------------------------------------------------------
-#                 SPRINT ACTIVITY
+#                 TEST FORCE START
 # -------------------------------------------------------
 
     @discord.ui.button(
-        label="Edit Sprint Activity",
-        style=discord.ButtonStyle.secondary,
-        row=1
-    )
-    async def sprint_activity(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-        await interaction.response.send_message(
-            "Sprint activity editing is coming soon!",
-            ephemeral=True
-        )
-
-
-# -------------------------------------------------------
-#                    TEST PING
-# -------------------------------------------------------
-
-    @discord.ui.button(
-        label="Test Ping",
+        label="Force Start",
         style=discord.ButtonStyle.success,
         row=2
     )
-    async def test_ping(
+    async def force_start(
         self,
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
-        if len(
-            self.participants
-        ) == 0:
+        if self.finished:
             await interaction.response.send_message(
-                "There are no participants to ping.",
+                already_finished_message,
+                ephemeral=True
+            )
+
+            return
+
+        if self.started:
+            await interaction.response.send_message(
+                already_started_message,
                 ephemeral=True
             )
 
@@ -861,21 +736,108 @@ class SprintView(
             ephemeral=True
         )
 
-        success = (
-            await self.send_start_notification()
+        if self.sprint_timer is not None:
+            self.sprint_timer.cancel()
+
+        await self.start_sprint()
+
+        self.sprint_timer = asyncio.create_task(
+            self.run_active_timer()
         )
 
-        if success:
-            await interaction.followup.send(
-                "Ping sent.",
+        await interaction.followup.send(
+            force_started_message,
+            ephemeral=True
+        )
+
+# -------------------------------------------------------
+#                  TEST FORCE END
+# -------------------------------------------------------
+
+    @discord.ui.button(
+        label="Force End",
+        style=discord.ButtonStyle.success,
+        row=2
+    )
+    async def force_end(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        if self.finished:
+            await interaction.response.send_message(
+                already_finished_message,
                 ephemeral=True
             )
 
-        else:
-            await interaction.followup.send(
-                "Ping failed.",
+            return
+
+        await interaction.response.defer(
+            ephemeral=True
+        )
+
+        if self.sprint_timer is not None:
+            self.sprint_timer.cancel()
+
+        await self.finish_sprint()
+
+        await interaction.followup.send(
+            force_ended_message,
+            ephemeral=True
+        )
+
+
+
+# -------------------------------------------------------
+#                TEST ENDING SOON
+# -------------------------------------------------------
+
+    @discord.ui.button(
+        label="Ending Soon",
+        style=discord.ButtonStyle.success,
+        row=2
+    )
+    async def force_ending_notification(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        if self.finished:
+            await interaction.response.send_message(
+                already_finished_message,
                 ephemeral=True
             )
+
+            return
+
+        if not self.started:
+            await interaction.response.send_message(
+                start_first_message,
+                ephemeral=True
+            )
+
+            return
+
+        if len(
+            self.participants
+        ) == 0:
+            await interaction.response.send_message(
+                no_test_participants_message,
+                ephemeral=True
+            )
+
+            return
+
+        await interaction.response.defer(
+            ephemeral=True
+        )
+
+        await self.send_ending_notification()
+
+        await interaction.followup.send(
+            force_ending_message,
+            ephemeral=True
+        )
 
 
 # -------------------------------------------------------
@@ -890,21 +852,19 @@ class SprintTimeModal(
         sprint_view: SprintView
     ):
         super().__init__(
-            title="Change Sprint Time"
+            title="⏱️ Change Sprint Time"
         )
 
         self.sprint_view = sprint_view
 
-        self.duration_input = (
-            discord.ui.TextInput(
-                label="Duration (minutes)",
-                default=str(
-                    sprint_view.duration
-                ),
-                style=discord.TextStyle.short,
-                required=True,
-                max_length=3
-            )
+        self.duration_input = discord.ui.TextInput(
+            label="Duration (minutes)",
+            default=str(
+                sprint_view.duration
+            ),
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=3
         )
 
         self.add_item(
@@ -912,16 +872,14 @@ class SprintTimeModal(
         )
 
         if not sprint_view.started:
-            self.starts_in_input = (
-                discord.ui.TextInput(
-                    label="Starts in (minutes)",
-                    default=str(
-                        sprint_view.starts_in
-                    ),
-                    style=discord.TextStyle.short,
-                    required=True,
-                    max_length=3
-                )
+            self.starts_in_input = discord.ui.TextInput(
+                label="Starts in (minutes)",
+                default=str(
+                    sprint_view.starts_in
+                ),
+                style=discord.TextStyle.short,
+                required=True,
+                max_length=3
             )
 
             self.add_item(
@@ -950,7 +908,7 @@ class SprintTimeModal(
 
         except ValueError:
             await interaction.response.send_message(
-                "Duration and start time must be numbers.",
+                time_invalid_message,
                 ephemeral=True
             )
 
@@ -958,7 +916,7 @@ class SprintTimeModal(
 
         if duration <= 0:
             await interaction.response.send_message(
-                "Duration must be greater than 0.",
+                duration_invalid_message,
                 ephemeral=True
             )
 
@@ -969,14 +927,14 @@ class SprintTimeModal(
             and starts_in < 0
         ):
             await interaction.response.send_message(
-                "Start time cannot be negative.",
+                start_time_invalid_message,
                 ephemeral=True
             )
 
             return
 
         await interaction.response.send_message(
-            "Sprint time updated!",
+            time_updated_message,
             ephemeral=True
         )
 
@@ -1006,24 +964,20 @@ class SprintCreateModal(
             title="Create a Sprint"
         )
 
-        self.duration_input = (
-            discord.ui.TextInput(
-                label="Duration (minutes)",
-                placeholder="e.g. 30",
-                style=discord.TextStyle.short,
-                required=True,
-                max_length=3
-            )
+        self.duration_input = discord.ui.TextInput(
+            label="Duration (minutes)",
+            placeholder="e.g. 30",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=3
         )
 
-        self.starts_in_input = (
-            discord.ui.TextInput(
-                label="Starts in (minutes)",
-                placeholder="e.g. 10",
-                style=discord.TextStyle.short,
-                required=False,
-                max_length=3
-            )
+        self.starts_in_input = discord.ui.TextInput(
+            label="Starts in (minutes)",
+            placeholder="e.g. 10",
+            style=discord.TextStyle.short,
+            required=False,
+            max_length=3
         )
 
         self.add_item(
@@ -1053,7 +1007,7 @@ class SprintCreateModal(
 
         except ValueError:
             await interaction.response.send_message(
-                "Duration and start time must be numbers.",
+                time_invalid_message,
                 ephemeral=True
             )
 
@@ -1064,7 +1018,7 @@ class SprintCreateModal(
             or starts_in < 0
         ):
             await interaction.response.send_message(
-                "Duration must be greater than 0, and start time cannot be negative.",
+                create_time_invalid_message,
                 ephemeral=True
             )
 
@@ -1090,9 +1044,7 @@ class SprintCreateModal(
             view=view
         )
 
-        message = (
-            await interaction.original_response()
-        )
+        message = await interaction.original_response()
 
         view.message = message
 
@@ -1102,10 +1054,8 @@ class SprintCreateModal(
             message_id=message.id
         )
 
-        view.sprint_timer = (
-            asyncio.create_task(
-                view.run_sprint()
-            )
+        view.sprint_timer = asyncio.create_task(
+            view.run_sprint()
         )
 
     async def on_error(

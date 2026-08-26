@@ -3,6 +3,23 @@ import os
 
 import discord
 
+from .messages import (
+    cancel_title,
+    empty_message,
+    empty_title,
+    interrupted_message,
+    interrupted_title,
+    no_results_message,
+    registration_message,
+    registration_title,
+    results_title,
+    start_focus_message,
+    start_title,
+    waiting_message,
+    waiting_title,
+    waiting_updated_message
+)
+
 
 # -------------------------------------------------------
 #                   SPRINT STORAGE
@@ -117,21 +134,14 @@ def create_waiting_embed(
     participants_text: str = "No participants yet.",
     updated: bool = False
 ):
-    if updated:
-        description = (
-            "Sprint time has been updated.\n"
-            "Use the buttons below to join "
-            "or modify the sprint."
-        )
-
-    else:
-        description = (
-            "Use the buttons below to join "
-            "or modify the sprint."
-        )
+    description = (
+        waiting_updated_message
+        if updated
+        else waiting_message
+    )
 
     embed = discord.Embed(
-        title="Productivity time!",
+        title=waiting_title,
         description=description
     )
 
@@ -166,10 +176,10 @@ def create_started_embed(
     participants_text: str
 ):
     embed = discord.Embed(
-        title="Sprint started!",
+        title=start_title,
         description=(
-            "Time to focus!\n"
-            f"Sprint ends <t:{end_timestamp}:R>."
+            f"{start_focus_message}\n"
+            f"Ends <t:{end_timestamp}:R>."
         )
     )
 
@@ -189,15 +199,16 @@ def create_started_embed(
 
 
 # -------------------------------------------------------
-#                     ENDED EMBED
+#                    FINISHED EMBED
 # -------------------------------------------------------
 
-def create_ended_embed(
+def create_finished_embed(
     duration: int,
-    participants_text: str
+    participants_text: str,
+    deadline_timestamp: int
 ):
     embed = discord.Embed(
-        title="Sprint ended!",
+        title="Sprint finished!",
         description="Time is up!"
     )
 
@@ -208,8 +219,17 @@ def create_ended_embed(
     )
 
     embed.add_field(
-        name="Participants who finished",
+        name="Participants",
         value=participants_text,
+        inline=False
+    )
+
+    embed.add_field(
+        name="Register your word count",
+        value=(
+            f"Registration closes "
+            f"<t:{deadline_timestamp}:R>."
+        ),
         inline=False
     )
 
@@ -224,10 +244,10 @@ def create_cancelled_embed(
     user_mention: str
 ):
     return discord.Embed(
-        title="Sprint cancelled",
+        title=cancel_title,
         description=(
             "The sprint was cancelled by "
-            f"{user_mention}."
+            f"**{user_mention}**."
         )
     )
 
@@ -238,11 +258,100 @@ def create_cancelled_embed(
 
 def create_empty_sprint_embed():
     return discord.Embed(
-        title="Oh, you forgot...",
-        description=(
-            "It's okay, we all get distracted."
-        )
+        title=empty_title,
+        description=empty_message
     )
+
+
+# -------------------------------------------------------
+#                    FINAL RESULTS
+# -------------------------------------------------------
+
+def create_results_embed(
+    sorted_results
+):
+    embed = discord.Embed(
+        title=results_title
+    )
+
+    if not sorted_results:
+        embed.description = no_results_message
+
+        return embed
+
+    medals = [
+        "🥇",
+        "🥈",
+        "🥉"
+    ]
+
+    result_lines = []
+
+    for position, sprint_user in enumerate(
+        sorted_results,
+        start=1
+    ):
+        medal = (
+            medals[position - 1]
+            if position <= 3
+            else f"**#{position}**"
+        )
+
+        name = sprint_user.user.display_name
+
+        project = (
+            sprint_user.project
+            if sprint_user.project
+            else "No project"
+        )
+
+        if sprint_user.final_wc is None:
+            total_text = "total unknown"
+
+        else:
+            total_text = (
+                f"{sprint_user.final_wc:,}"
+            )
+
+        if sprint_user.words_written is None:
+            line = (
+                f"{medal} **{name}** finished "
+                f"✦ progress unknown "
+                f"✦ *{project}* is now "
+                f"**{total_text} words**"
+            )
+
+        elif sprint_user.words_written >= 0:
+            line = (
+                f"{medal} **{name}** wrote "
+                f"*+{sprint_user.words_written:,} words* "
+                f"✦ new total for *{project}* is "
+                f"**{total_text} words**"
+            )
+
+        else:
+            removed = abs(
+                sprint_user.words_written
+            )
+
+            line = (
+                f"{medal} **{name}** made progress... "
+                f"just backwards "
+                f"✦ *{project}* is "
+                f"**{removed:,} words shorter** "
+                f"✦ new total is "
+                f"**{total_text} words**"
+            )
+
+        result_lines.append(
+            line
+        )
+
+    embed.description = "\n".join(
+        result_lines
+    )
+
+    return embed
 
 
 # -------------------------------------------------------
@@ -251,12 +360,8 @@ def create_empty_sprint_embed():
 
 def create_interrupted_embed():
     return discord.Embed(
-        title="Bot out of order",
-        description=(
-            "This sprint was interrupted because "
-            "the bot went offline.\n\n"
-            "Sorry for the inconvenience."
-        )
+        title=interrupted_title,
+        description=interrupted_message
     )
 
 
@@ -267,7 +372,9 @@ def create_interrupted_embed():
 async def mark_message_as_interrupted(
     message: discord.Message
 ):
-    interrupted_embed = create_interrupted_embed()
+    interrupted_embed = (
+        create_interrupted_embed()
+    )
 
     await message.edit(
         content=None,
@@ -330,8 +437,8 @@ async def recover_old_sprints(
     client: discord.Client
 ):
     active_titles = {
-        "Productivity time!",
-        "Sprint started!"
+        waiting_title,
+        start_title
     }
 
     for guild in client.guilds:
@@ -340,7 +447,10 @@ async def recover_old_sprints(
                 async for message in channel.history(
                     limit=200
                 ):
-                    if message.author.id != client.user.id:
+                    if (
+                        message.author.id
+                        != client.user.id
+                    ):
                         continue
 
                     if not message.embeds:
@@ -348,7 +458,10 @@ async def recover_old_sprints(
 
                     embed = message.embeds[0]
 
-                    if embed.title not in active_titles:
+                    if (
+                        embed.title
+                        not in active_titles
+                    ):
                         continue
 
                     if not message.components:
