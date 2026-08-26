@@ -1,0 +1,669 @@
+{
+    "609461893253300306": {
+        "c25174d3-8a4c-4f16-a300-2b039a411c8e": {
+            "project_id": "c25174d3-8a4c-4f16-a300-2b039a411c8e",
+            "name": "The Fire In the Blood",
+            "description": "BigBang 2026",
+            "status": "Active",
+            "wordcount": 123456,
+            "goal": 200000,
+            "created_at": "2026-03-01T00:00:00+00:00"
+        },
+        "ed164d85-bebf-4276-8f2c-d6e83bd784c9": {
+            "project_id": "ed164d85-bebf-4276-8f2c-d6e83bd784c9",
+            "name": "A Creature of Yin",
+            "description": "",
+            "status": "Completed",
+            "wordcount": 80000,
+            "goal": null,
+            "created_at": "2026-08-26T07:31:06.318328+00:00"
+        },
+        "58908b2b-fe65-4489-b929-fa125bcb1ab4": {
+            "project_id": "58908b2b-fe65-4489-b929-fa125bcb1ab4",
+            "name": "test2",
+            "description": "",
+            "status": "Draft",
+            "wordcount": 500,
+            "goal": null,
+            "created_at": "2026-08-26T07:36:47.121686+00:00"
+        },
+        "writer_bot:0": {
+            "project_id": "writer_bot:0",
+            "name": "My heart knew it was you",
+            "description": "DD Prisoner of war omega wwx",
+            "status": "Active",
+            "wordcount": 1483,
+            "goal": null,
+            "created_at": "07-04-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 0
+            },
+            "source_data": {
+                "id": 0,
+                "title": "My heart knew it was you",
+                "shortcode": "myheart",
+                "description": "DD Prisoner of war omega wwx",
+                "created_at": 1775536348,
+                "completed": false,
+                "status": "InProgress",
+                "genre": "FanFiction",
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 1483,
+                "project_goal": null,
+                "project_deadline": null
+            }
+        },
+        "writer_bot:3": {
+            "project_id": "writer_bot:3",
+            "name": "A Creature of Yin",
+            "description": "",
+            "status": "Editing",
+            "wordcount": 89674,
+            "goal": 70000,
+            "created_at": "16-04-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 3
+            },
+            "source_data": {
+                "id": 3,
+                "title": "A Creature of Yin",
+                "shortcode": "yin",
+                "description": null,
+                "created_at": 1776384005,
+                "completed": false,
+                "status": "Editing",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 89674,
+                "project_goal": 70000,
+                "project_deadline": "2026-06-15"
+            }
+        },
+        "writer_bot:2": {
+            "project_id": "writer_bot:2",
+            "name": "Mdzs BigBang",
+            "description": "",
+            "status": "Active",
+            "wordcount": 123062,
+            "goal": 180000,
+            "created_at": "09-04-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 2
+            },
+            "source_data": {
+                "id": 2,
+                "title": "Mdzs BigBang",
+                "shortcode": "bb",
+                "description": null,
+                "created_at": 1775759297,
+                "completed": false,
+                "status": "InProgress",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 123062,
+                "project_goal": 180000,
+                "project_deadline": "2026-08-31"
+            }
+        },
+        "writer_bot:4": {
+            "project_id": "writer_bot:4",
+            "name": "dnd au",
+            "description": "",
+            "status": "Draft",
+            "wordcount": 0,
+            "goal": null,
+            "created_at": "03-05-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 4
+            },
+            "source_data": {
+                "id": 4,
+                "title": "dnd au",
+                "shortcode": "dnd",
+                "description": null,
+                "created_at": 1777784646,
+                "completed": false,
+                "status": "Planning",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 0,
+                "project_goal": null,
+                "project_deadline": null
+            }
+        },
+        "writer_bot:5": {
+            "project_id": "writer_bot:5",
+            "name": "Wwx gets his body back and wears LWJ clothes",
+            "description": "",
+            "status": "Active",
+            "wordcount": 4520,
+            "goal": 10000,
+            "created_at": "03-05-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 5
+            },
+            "source_data": {
+                "id": 5,
+                "title": "Wwx gets his body back and wears LWJ clothes",
+                "shortcode": "gusu robes",
+                "description": null,
+                "created_at": 1777860406,
+                "completed": false,
+                "status": "InProgress",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 4520,
+                "project_goal": 10000,
+                "project_deadline": null
+            }
+        },
+        "writer_bot:6": {
+            "project_id": "writer_bot:6",
+            "name": "wangxian flowercrown",
+            "description": "Wangxian art for may's prompt 3 bows",
+            "status": "Completed",
+            "wordcount": 0,
+            "goal": null,
+            "created_at": "11-05-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 6
+            },
+            "source_data": {
+                "id": 6,
+                "title": "wangxian flowercrown",
+                "shortcode": "flower",
+                "description": "Wangxian art for may's prompt 3 bows",
+                "created_at": 1778509997,
+                "completed": true,
+                "status": "Published",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 0,
+                "project_goal": null,
+                "project_deadline": "2026-05-25"
+            }
+        },
+        "writer_bot:7": {
+            "project_id": "writer_bot:7",
+            "name": "Not All Treasure Is Made Of Gold",
+            "description": "Sangcheng Mermay, collab with Nyll",
+            "status": "Completed",
+            "wordcount": 4909,
+            "goal": 3000,
+            "created_at": "11-05-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 7
+            },
+            "source_data": {
+                "id": 7,
+                "title": "Not All Treasure Is Made Of Gold",
+                "shortcode": "MM",
+                "description": "Sangcheng Mermay, collab with Nyll",
+                "created_at": 1778537247,
+                "completed": true,
+                "status": "Published",
+                "genre": "FanFiction",
+                "url": "https://archiveofourown.org/works/85641486",
+                "image_url": "https://64.media.tumblr.com/9eacdc69beb3650f3c4bd11d7c436c40/fdbf8bea3a973287-00/s2048x3072/c484af6a08604881baff4d17cd8cc5e2101d71a7.pnj",
+                "tags": [],
+                "wordcount": 4909,
+                "project_goal": 3000,
+                "project_deadline": "2026-05-20"
+            }
+        },
+        "writer_bot:8": {
+            "project_id": "writer_bot:8",
+            "name": "Immortal wangxian",
+            "description": "Wwx can't give up his core because it turns out it's starting to take root bc he is becoming Immortal, later lwj ascends out of spite",
+            "status": "Draft",
+            "wordcount": 0,
+            "goal": null,
+            "created_at": "15-05-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 8
+            },
+            "source_data": {
+                "id": 8,
+                "title": "Immortal wangxian",
+                "shortcode": "Immortal",
+                "description": "Wwx can't give up his core because it turns out it's starting to take root bc he is becoming Immortal, later lwj ascends out of spite",
+                "created_at": 1778898797,
+                "completed": false,
+                "status": "Planning",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 0,
+                "project_goal": null,
+                "project_deadline": null
+            }
+        },
+        "writer_bot:9": {
+            "project_id": "writer_bot:9",
+            "name": "Senior Jiang wwx",
+            "description": "",
+            "status": "Draft",
+            "wordcount": 0,
+            "goal": null,
+            "created_at": "15-05-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 9
+            },
+            "source_data": {
+                "id": 9,
+                "title": "Senior Jiang wwx",
+                "shortcode": "jiang",
+                "description": null,
+                "created_at": 1778899066,
+                "completed": false,
+                "status": "Planning",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 0,
+                "project_goal": null,
+                "project_deadline": null
+            }
+        },
+        "writer_bot:10": {
+            "project_id": "writer_bot:10",
+            "name": "The Odyssey but it's mdzs",
+            "description": "1 chapter for every song",
+            "status": "Draft",
+            "wordcount": 0,
+            "goal": null,
+            "created_at": "19-05-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 10
+            },
+            "source_data": {
+                "id": 10,
+                "title": "The Odyssey but it's mdzs",
+                "shortcode": "epic",
+                "description": "1 chapter for every song",
+                "created_at": 1779213811,
+                "completed": false,
+                "status": "Planning",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 0,
+                "project_goal": null,
+                "project_deadline": null
+            }
+        },
+        "writer_bot:11": {
+            "project_id": "writer_bot:11",
+            "name": "Akuma no Ko",
+            "description": "Wwx(? Wangxian(? Idk",
+            "status": "Draft",
+            "wordcount": 0,
+            "goal": null,
+            "created_at": "20-05-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 11
+            },
+            "source_data": {
+                "id": 11,
+                "title": "Akuma no Ko",
+                "shortcode": "ank",
+                "description": "Wwx(? Wangxian(? Idk",
+                "created_at": 1779315634,
+                "completed": false,
+                "status": "Planning",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 0,
+                "project_goal": null,
+                "project_deadline": null
+            }
+        },
+        "writer_bot:12": {
+            "project_id": "writer_bot:12",
+            "name": "Social media planning and posting time",
+            "description": "",
+            "status": "Active",
+            "wordcount": 0,
+            "goal": null,
+            "created_at": "23-05-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 12
+            },
+            "source_data": {
+                "id": 12,
+                "title": "Social media planning and posting time",
+                "shortcode": "sm",
+                "description": null,
+                "created_at": 1779587549,
+                "completed": false,
+                "status": "InProgress",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 0,
+                "project_goal": null,
+                "project_deadline": null
+            }
+        },
+        "writer_bot:17": {
+            "project_id": "writer_bot:17",
+            "name": "How to invite your straight best friend to pride",
+            "description": "",
+            "status": "Active",
+            "wordcount": 2144,
+            "goal": null,
+            "created_at": "01-06-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 17
+            },
+            "source_data": {
+                "id": 17,
+                "title": "How to invite your straight best friend to pride",
+                "shortcode": "June3Bows",
+                "description": null,
+                "created_at": 1780339290,
+                "completed": false,
+                "status": "InProgress",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 2144,
+                "project_goal": null,
+                "project_deadline": null
+            }
+        },
+        "writer_bot:14": {
+            "project_id": "writer_bot:14",
+            "name": "Memories of Ink",
+            "description": "Hanguang-June day 15",
+            "status": "Completed",
+            "wordcount": 10632,
+            "goal": 5000,
+            "created_at": "26-05-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 14
+            },
+            "source_data": {
+                "id": 14,
+                "title": "Memories of Ink",
+                "shortcode": "ink",
+                "description": "Hanguang-June day 15",
+                "created_at": 1779766206,
+                "completed": true,
+                "status": "Published",
+                "genre": null,
+                "url": "https://archiveofourown.org/works/86781306",
+                "image_url": null,
+                "tags": [],
+                "wordcount": 10632,
+                "project_goal": 5000,
+                "project_deadline": "2026-06-10"
+            }
+        },
+        "writer_bot:15": {
+            "project_id": "writer_bot:15",
+            "name": "Hanguang-june gag",
+            "description": "",
+            "status": "Completed",
+            "wordcount": 0,
+            "goal": null,
+            "created_at": "28-05-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 15
+            },
+            "source_data": {
+                "id": 15,
+                "title": "Hanguang-june gag",
+                "shortcode": "gag",
+                "description": null,
+                "created_at": 1779994688,
+                "completed": true,
+                "status": "Published",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 0,
+                "project_goal": null,
+                "project_deadline": "2026-06-06"
+            }
+        },
+        "writer_bot:16": {
+            "project_id": "writer_bot:16",
+            "name": "yi city, xueyu was a thing",
+            "description": "",
+            "status": "Draft",
+            "wordcount": 0,
+            "goal": null,
+            "created_at": "29-05-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 16
+            },
+            "source_data": {
+                "id": 16,
+                "title": "yi city, xueyu was a thing",
+                "shortcode": "xueyu",
+                "description": null,
+                "created_at": 1780072548,
+                "completed": false,
+                "status": "Planning",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 0,
+                "project_goal": null,
+                "project_deadline": null
+            }
+        },
+        "writer_bot:18": {
+            "project_id": "writer_bot:18",
+            "name": "3zun but its wwx, xy and jgy",
+            "description": "",
+            "status": "Draft",
+            "wordcount": 0,
+            "goal": null,
+            "created_at": "08-06-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 18
+            },
+            "source_data": {
+                "id": 18,
+                "title": "3zun but its wwx, xy and jgy",
+                "shortcode": "3zun2.0",
+                "description": null,
+                "created_at": 1780895199,
+                "completed": false,
+                "status": "Planning",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 0,
+                "project_goal": null,
+                "project_deadline": null
+            }
+        },
+        "writer_bot:19": {
+            "project_id": "writer_bot:19",
+            "name": "Pride Wangxian",
+            "description": "",
+            "status": "Active",
+            "wordcount": 0,
+            "goal": null,
+            "created_at": "09-06-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 19
+            },
+            "source_data": {
+                "id": 19,
+                "title": "Pride Wangxian",
+                "shortcode": "pride",
+                "description": null,
+                "created_at": 1781043664,
+                "completed": false,
+                "status": "InProgress",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 0,
+                "project_goal": null,
+                "project_deadline": "2026-06-15"
+            }
+        },
+        "writer_bot:20": {
+            "project_id": "writer_bot:20",
+            "name": "wen xu x wwx",
+            "description": "",
+            "status": "Draft",
+            "wordcount": 0,
+            "goal": null,
+            "created_at": "10-06-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 20
+            },
+            "source_data": {
+                "id": 20,
+                "title": "wen xu x wwx",
+                "shortcode": "xuxian",
+                "description": null,
+                "created_at": 1781072224,
+                "completed": false,
+                "status": "Planning",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 0,
+                "project_goal": null,
+                "project_deadline": null
+            }
+        },
+        "writer_bot:21": {
+            "project_id": "writer_bot:21",
+            "name": "Sometimes I forget I'm an artist",
+            "description": "",
+            "status": "Active",
+            "wordcount": 0,
+            "goal": null,
+            "created_at": "08-08-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 21
+            },
+            "source_data": {
+                "id": 21,
+                "title": "Sometimes I forget I'm an artist",
+                "shortcode": "art",
+                "description": null,
+                "created_at": 1786233727,
+                "completed": false,
+                "status": "InProgress",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 0,
+                "project_goal": null,
+                "project_deadline": null
+            }
+        },
+        "writer_bot:22": {
+            "project_id": "writer_bot:22",
+            "name": "Slave of code",
+            "description": "",
+            "status": "Active",
+            "wordcount": 0,
+            "goal": null,
+            "created_at": "17-08-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 22
+            },
+            "source_data": {
+                "id": 22,
+                "title": "Slave of code",
+                "shortcode": "code",
+                "description": null,
+                "created_at": 1786945461,
+                "completed": false,
+                "status": "InProgress",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 0,
+                "project_goal": null,
+                "project_deadline": null
+            }
+        },
+        "writer_bot:23": {
+            "project_id": "writer_bot:23",
+            "name": "the super bot",
+            "description": "",
+            "status": "Active",
+            "wordcount": 0,
+            "goal": null,
+            "created_at": "21-08-2026",
+            "source": {
+                "type": "writer_bot",
+                "project_id": 23
+            },
+            "source_data": {
+                "id": 23,
+                "title": "the super bot",
+                "shortcode": "bot",
+                "description": null,
+                "created_at": 1787321029,
+                "completed": false,
+                "status": "InProgress",
+                "genre": null,
+                "url": null,
+                "image_url": null,
+                "tags": [],
+                "wordcount": 0,
+                "project_goal": null,
+                "project_deadline": null
+            }
+        }
+    }
+}

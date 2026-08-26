@@ -4,6 +4,9 @@ import uuid
 
 import discord
 
+from modules.user_profile.projects import (
+    create_project_picker_embed
+)
 from .messages import (
     already_finished_message,
     already_joined_message,
@@ -30,6 +33,7 @@ from .messages import (
 )
 
 from .sprint_activity import (
+    ActivityChangeView,
     start_results_registration
 )
 
@@ -42,11 +46,9 @@ from .system_messages import (
     remove_active_sprint
 )
 from .users import (
-    EditSprintActivityView,
     JoinSprintView,
     SprintParticipants
 )
-
 # -------------------------------------------------------
 #                CONFIRMATION VIEW
 # -------------------------------------------------------
@@ -597,7 +599,7 @@ class SprintView(
         )
 
         await interaction.response.send_message(
-            join_question_message,
+            embed=create_project_picker_embed(),
             view=join_view,
             ephemeral=True
         )
@@ -700,7 +702,59 @@ class SprintView(
             modal
         )
 
+        
+# -------------------------------------------------------
+#                 EDIT SPRINT ACTIVITY
+# -------------------------------------------------------
 
+    @discord.ui.button(
+        label="Edit Sprint Activity",
+        style=discord.ButtonStyle.secondary,
+        row=1
+    )
+    async def sprint_activity(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        if self.finished:
+            await interaction.response.send_message(
+                already_finished_message,
+                ephemeral=True
+            )
+
+            return
+
+        sprint_user = (
+            self.participants.get_user(
+                interaction.user.id
+            )
+        )
+
+        if sprint_user is None:
+            await interaction.response.send_message(
+                "You need to join the sprint first.",
+                ephemeral=True
+            )
+
+            return
+
+        activity_view = ActivityChangeView(
+            sprint_view=self,
+            sprint_user=sprint_user
+        )
+
+        await interaction.response.send_message(
+            (
+                f"Current project: **{sprint_user.project}** "
+                f"✦ {sprint_user.initial_wc:,} words\n\n"
+                "Do you want to register progress "
+                "before changing activity?"
+            ),
+            view=activity_view,
+            ephemeral=True
+        )
+        
 # -------------------------------------------------------
 #                 TEST FORCE START
 # -------------------------------------------------------
@@ -1068,51 +1122,4 @@ class SprintCreateModal(
 
         print(
             repr(error)
-        )
-        
-# -------------------------------------------------------
-#                 EDIT SPRINT ACTIVITY
-# -------------------------------------------------------
-
-    @discord.ui.button(
-        label="Edit Sprint Activity",
-        style=discord.ButtonStyle.secondary,
-        row=1
-    )
-    async def sprint_activity(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-        if self.finished:
-            await interaction.response.send_message(
-                already_finished_message,
-                ephemeral=True
-            )
-
-            return
-
-        sprint_user = (
-            self.participants.get_user(
-                interaction.user.id
-            )
-        )
-
-        if sprint_user is None:
-            await interaction.response.send_message(
-                "You need to join the sprint first.",
-                ephemeral=True
-            )
-
-            return
-
-        activity_view = EditSprintActivityView(
-            sprint_view=self,
-            user_id=interaction.user.id
-        )
-
-        await interaction.response.send_message(
-            "Edit your sprint activity:",
-            view=activity_view,
-            ephemeral=True
         )

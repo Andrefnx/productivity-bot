@@ -11,6 +11,23 @@ from modules.sprints import (
     recover_interrupted_sprints
 )
 
+from modules.user_profile import (
+    ProfileView,
+    create_profile_embed
+)
+from modules.config import (
+    ConfigView,
+    create_config_embed
+)
+
+from modules.config import (
+    get_user_config
+)
+
+#-------------------------------------------------------
+#                       SETUP  
+#-------------------------------------------------------
+
 
 load_dotenv()
 
@@ -52,6 +69,62 @@ async def sprint(
         sprint_modal
     )
 
+
+# -------------------------------------------------------
+#                       PROFILE
+# -------------------------------------------------------
+
+@tree.command(
+    name="profile",
+    description="Open your profile"
+)
+async def profile(
+    interaction: discord.Interaction
+):
+    profile_embed = create_profile_embed(
+        interaction.user
+    )
+
+    profile_view = ProfileView(
+        owner=interaction.user
+    )
+
+    config = get_user_config(
+        interaction.user.id
+    )
+
+    is_private = (
+        config[
+            "profile_visibility"
+        ]
+        == "private"
+    )
+
+    await interaction.response.send_message(
+        embed=profile_embed,
+        view=profile_view,
+        ephemeral=is_private
+    )
+# -------------------------------------------------------
+#                       CONFIG
+# -------------------------------------------------------
+
+@tree.command(
+    name="config",
+    description="Manage your settings"
+)
+async def config(
+    interaction: discord.Interaction
+):
+    await interaction.response.send_message(
+        embed=create_config_embed(
+            interaction.user
+        ),
+        view=ConfigView(
+            owner=interaction.user
+        ),
+        ephemeral=True
+    )
 
 # -------------------------------------------------------
 #                  DISCORD CONNECTION

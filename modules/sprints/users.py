@@ -1,99 +1,16 @@
-import json
-import os
 import uuid
 
 import discord
 
-from .messages import (
-    already_joined_message,
-    joined_message,
-    join_form_owner_message,
-    join_menu_owner_message,
-    no_participants_message,
-    no_previous_data_message
+from modules.user_profile.profile import (
+    set_last_project
 )
 
-
-# -------------------------------------------------------
-#                    USER STORAGE
-# -------------------------------------------------------
-
-DATA_DIRECTORY = "data"
-
-SPRINT_USERS_FILE = os.path.join(
-    DATA_DIRECTORY,
-    "sprint_users.json"
+from modules.user_profile.projects import (
+    ProjectPickerView,
+    create_project_picker_embed,
+    update_project
 )
-
-
-def load_sprint_users():
-    if not os.path.exists(
-        SPRINT_USERS_FILE
-    ):
-        return {}
-
-    try:
-        with open(
-            SPRINT_USERS_FILE,
-            "r",
-            encoding="utf-8"
-        ) as file:
-            return json.load(
-                file
-            )
-
-    except (
-        json.JSONDecodeError,
-        OSError
-    ):
-        return {}
-
-
-def save_sprint_users(
-    users
-):
-    os.makedirs(
-        DATA_DIRECTORY,
-        exist_ok=True
-    )
-
-    with open(
-        SPRINT_USERS_FILE,
-        "w",
-        encoding="utf-8"
-    ) as file:
-        json.dump(
-            users,
-            file,
-            indent=4
-        )
-
-
-def save_previous_sprint_data(
-    user_id: int,
-    initial_wc,
-    project
-):
-    users = load_sprint_users()
-
-    users[str(user_id)] = {
-        "initial_wc": initial_wc,
-        "project": project
-    }
-
-    save_sprint_users(
-        users
-    )
-
-
-def get_previous_sprint_data(
-    user_id: int
-):
-    users = load_sprint_users()
-
-    return users.get(
-        str(user_id)
-    )
 
 
 # -------------------------------------------------------
@@ -103,10 +20,9 @@ def get_previous_sprint_data(
 class SprintUser:
     def __init__(
         self,
-        user: discord.User | discord.Member,
+        user,
         sprint_id: str,
-        initial_wc=None,
-        project=None
+        project
     ):
         self.user = user
         self.user_id = user.id
@@ -121,17 +37,36 @@ class SprintUser:
             uuid.uuid4()
         )
 
-        self.initial_wc = initial_wc
+        self.project_id = (
+            project[
+                "project_id"
+            ]
+        )
+
+        self.project = (
+            project.get(
+                "name",
+                "Untitled"
+            )
+        )
+
+        self.initial_wc = (
+            project.get(
+                "wordcount",
+                0
+            )
+        )
+
         self.final_wc = None
         self.words_written = None
 
+        self.accumulated_words = 0
+
         self.result_registered = False
 
-        self.project = (
-            project.strip()
-            if project
-            else None
-        )
+        self.activity_history = []
+
+        self.set_last_project()
 
     @property
     def mention(
@@ -139,31 +74,87 @@ class SprintUser:
     ):
         return f"<@{self.user_id}>"
 
-# -------------------------------------------------------
-#                 PARTICIPANT DISPLAY
-# -------------------------------------------------------
+    def set_last_project(
+        self
+    ):
+        set_last_project(
+            user_id=self.user_id,
+            project_id=self.project_id
+        )
+
+    def archive_activity(
+        self,
+        final_wc=None,
+        words_written=None,
+        registered=False
+    ):
+        self.activity_history.append(
+            {
+                "project_id": self.project_id,
+                "project": self.project,
+                "initial_wc": self.initial_wc,
+                "final_wc": final_wc,
+                "words_written": words_written,
+                "registered": registered
+            }
+        )
+
+        if (
+            registered
+            and words_written is not None
+        ):
+            self.accumulated_words += (
+                words_written
+            )
+
+        if (
+            registered
+            and final_wc is not None
+        ):
+            update_project(
+                user_id=self.user_id,
+                project_id=self.project_id,
+                wordcount=final_wc
+            )
+
+    def switch_project(
+        self,
+        project
+    ):
+        self.project_id = (
+            project[
+                "project_id"
+            ]
+        )
+
+        self.project = (
+            project.get(
+                "name",
+                "Untitled"
+            )
+        )
+
+        self.initial_wc = (
+            project.get(
+                "wordcount",
+                0
+            )
+        )
+
+        self.final_wc = None
+        self.words_written = None
+
+        self.result_registered = False
+
+        self.set_last_project()
 
     def get_participant_text(
         self
     ):
-        if self.initial_wc is None:
-            wordcount = "no word count"
-
-        else:
-            wordcount = (
-                f"{self.initial_wc:,} words"
-            )
-
-        project = (
-            self.project
-            if self.project
-            else "no project"
-        )
-
         return (
-            f"{self.mention}  ✦  "
-            f"{wordcount} ✦  "
-            f"**{project}**"
+            f"{self.mention} ✦ "
+            f"{self.initial_wc:,} words ✦ "
+            f"**{self.project}**"
         )
 
 
@@ -181,9 +172,8 @@ class SprintParticipants:
 
     def add_user(
         self,
-        user: discord.User | discord.Member,
-        initial_wc=None,
-        project=None
+        user,
+        project
     ):
         if user.id in self.users:
             return False
@@ -191,17 +181,12 @@ class SprintParticipants:
         sprint_user = SprintUser(
             user=user,
             sprint_id=self.sprint_id,
-            initial_wc=initial_wc,
             project=project
         )
 
-        self.users[user.id] = sprint_user
-
-        save_previous_sprint_data(
-            user_id=user.id,
-            initial_wc=initial_wc,
-            project=project
-        )
+        self.users[
+            user.id
+        ] = sprint_user
 
         return True
 
@@ -212,7 +197,9 @@ class SprintParticipants:
         if user_id not in self.users:
             return False
 
-        del self.users[user_id]
+        del self.users[
+            user_id
+        ]
 
         return True
 
@@ -220,7 +207,10 @@ class SprintParticipants:
         self,
         user_id: int
     ):
-        return user_id in self.users
+        return (
+            user_id
+            in self.users
+        )
 
     def get_user(
         self,
@@ -250,7 +240,7 @@ class SprintParticipants:
         self
     ):
         if not self.users:
-            return no_participants_message
+            return "No participants yet."
 
         return "\n".join(
             sprint_user.get_participant_text()
@@ -296,409 +286,61 @@ class SprintParticipants:
 # -------------------------------------------------------
 
 class JoinSprintView(
-    discord.ui.View
+    ProjectPickerView
 ):
     def __init__(
         self,
         sprint_view,
         user_id: int
     ):
-        super().__init__(
-            timeout=60
-        )
-
         self.sprint_view = sprint_view
-        self.user_id = user_id
 
-    async def interaction_check(
+        super().__init__(
+            owner_id=user_id,
+            on_confirm=self.join_project,
+            show_last_project=True
+        )
+
+    async def join_project(
         self,
-        interaction: discord.Interaction
-    ):
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message(
-                join_menu_owner_message,
-                ephemeral=True
-            )
-
-            return False
-
-        return True
-
-    @discord.ui.button(
-        label="📝 Enter Details",
-        style=discord.ButtonStyle.primary
-    )
-    async def enter_details(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
+        interaction,
+        project
     ):
         if self.sprint_view.participants.has_user(
             interaction.user.id
         ):
             await interaction.response.send_message(
-                already_joined_message,
+                "You are already in this sprint.",
                 ephemeral=True
             )
 
             return
 
-        modal = JoinSprintModal(
-            sprint_view=self.sprint_view,
-            user_id=interaction.user.id
-        )
-
-        await interaction.response.send_modal(
-            modal
-        )
-
-    @discord.ui.button(
-        label="↩️ Use Previous",
-        style=discord.ButtonStyle.secondary
-    )
-    async def use_previous(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-        if self.sprint_view.participants.has_user(
-            interaction.user.id
-        ):
-            await interaction.response.send_message(
-                already_joined_message,
-                ephemeral=True
-            )
-
-            return
-
-        previous_data = get_previous_sprint_data(
-            interaction.user.id
-        )
-
-        if previous_data is None:
-            await interaction.response.send_message(
-                no_previous_data_message,
-                ephemeral=True
-            )
-
-            return
-
-        added = self.sprint_view.participants.add_user(
-            user=interaction.user,
-            initial_wc=previous_data.get(
-                "initial_wc"
-            ),
-            project=previous_data.get(
-                "project"
+        added = (
+            self.sprint_view.participants.add_user(
+                user=interaction.user,
+                project=project
             )
         )
 
         if not added:
             await interaction.response.send_message(
-                already_joined_message,
+                "You are already in this sprint.",
                 ephemeral=True
             )
 
             return
 
         await interaction.response.edit_message(
-            content=joined_message,
+            content=None,
+            embed=discord.Embed(
+                title="Joined sprint",
+                description=(
+                    f"**{project['name']}** ✦ "
+                    f"{project.get('wordcount', 0):,} words"
+                )
+            ),
             view=None
         )
 
         await self.sprint_view.update_current_message()
-
-        self.stop()
-
-
-# -------------------------------------------------------
-#                    JOIN MODAL
-# -------------------------------------------------------
-
-class JoinSprintModal(
-    discord.ui.Modal
-):
-    def __init__(
-        self,
-        sprint_view,
-        user_id: int
-    ):
-        super().__init__(
-            title="Join Sprint"
-        )
-
-        self.sprint_view = sprint_view
-        self.user_id = user_id
-
-        self.initial_wc_input = (
-            discord.ui.TextInput(
-                label="Initial word count",
-                placeholder="e.g. 1932",
-                style=discord.TextStyle.short,
-                required=False,
-                max_length=10
-            )
-        )
-
-        self.project_input = (
-            discord.ui.TextInput(
-                label="Project",
-                placeholder="e.g. Big Bang 2026",
-                style=discord.TextStyle.short,
-                required=False,
-                max_length=100
-            )
-        )
-
-        self.add_item(
-            self.initial_wc_input
-        )
-
-        self.add_item(
-            self.project_input
-        )
-
-    async def on_submit(
-        self,
-        interaction: discord.Interaction
-    ):
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message(
-                join_form_owner_message,
-                ephemeral=True
-            )
-
-            return
-
-        if self.sprint_view.participants.has_user(
-            interaction.user.id
-        ):
-            await interaction.response.send_message(
-                already_joined_message,
-                ephemeral=True
-            )
-
-            return
-
-        initial_wc = None
-
-        if self.initial_wc_input.value:
-            try:
-                initial_wc = int(
-                    self.initial_wc_input.value
-                )
-
-            except ValueError:
-                await interaction.response.send_message(
-                    "⚠️ Word count must be a number.",
-                    ephemeral=True
-                )
-
-                return
-
-            if initial_wc < 0:
-                await interaction.response.send_message(
-                    "⚠️ Word count cannot be negative.",
-                    ephemeral=True
-                )
-
-                return
-
-        project = (
-            self.project_input.value.strip()
-            or None
-        )
-
-        added = self.sprint_view.participants.add_user(
-            user=interaction.user,
-            initial_wc=initial_wc,
-            project=project
-        )
-
-        if not added:
-            await interaction.response.send_message(
-                already_joined_message,
-                ephemeral=True
-            )
-
-            return
-
-        await interaction.response.send_message(
-            joined_message,
-            ephemeral=True
-        )
-
-        await self.sprint_view.update_current_message()
-        
-        
-# -------------------------------------------------------
-#                 EDIT ACTIVITY MODAL
-# -------------------------------------------------------
-
-class EditSprintActivityModal(
-    discord.ui.Modal
-):
-    def __init__(
-        self,
-        sprint_view,
-        sprint_user: SprintUser
-    ):
-        super().__init__(
-            title="Edit Sprint Activity"
-        )
-
-        self.sprint_view = sprint_view
-        self.sprint_user = sprint_user
-
-        current_wc = (
-            str(sprint_user.initial_wc)
-            if sprint_user.initial_wc is not None
-            else ""
-        )
-
-        current_project = (
-            sprint_user.project
-            if sprint_user.project
-            else ""
-        )
-
-        self.wordcount_input = discord.ui.TextInput(
-            label="Word count",
-            default=current_wc,
-            placeholder="e.g. 1932",
-            style=discord.TextStyle.short,
-            required=False,
-            max_length=10
-        )
-
-        self.project_input = discord.ui.TextInput(
-            label="Project",
-            default=current_project,
-            placeholder="e.g. Big Bang 2026",
-            style=discord.TextStyle.short,
-            required=False,
-            max_length=100
-        )
-
-        self.add_item(
-            self.wordcount_input
-        )
-
-        self.add_item(
-            self.project_input
-        )
-
-    async def on_submit(
-        self,
-        interaction: discord.Interaction
-    ):
-        wordcount = None
-
-        if self.wordcount_input.value:
-            try:
-                wordcount = int(
-                    self.wordcount_input.value
-                )
-
-            except ValueError:
-                await interaction.response.send_message(
-                    "Word count must be a number.",
-                    ephemeral=True
-                )
-
-                return
-
-            if wordcount < 0:
-                await interaction.response.send_message(
-                    "Word count cannot be negative.",
-                    ephemeral=True
-                )
-
-                return
-
-        project = (
-            self.project_input.value.strip()
-            or None
-        )
-
-        self.sprint_user.initial_wc = wordcount
-        self.sprint_user.project = project
-
-        save_previous_sprint_data(
-            user_id=self.sprint_user.user_id,
-            initial_wc=wordcount,
-            project=project
-        )
-
-        await interaction.response.send_message(
-            "Sprint activity updated.",
-            ephemeral=True
-        )
-
-        await self.sprint_view.update_current_message()
-
-
-# -------------------------------------------------------
-#                 EDIT ACTIVITY VIEW
-# -------------------------------------------------------
-
-class EditSprintActivityView(
-    discord.ui.View
-):
-    def __init__(
-        self,
-        sprint_view,
-        user_id: int
-    ):
-        super().__init__(
-            timeout=60
-        )
-
-        self.sprint_view = sprint_view
-        self.user_id = user_id
-
-    async def interaction_check(
-        self,
-        interaction: discord.Interaction
-    ):
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message(
-                "This activity menu belongs to another user.",
-                ephemeral=True
-            )
-
-            return False
-
-        return True
-
-    @discord.ui.button(
-        label="Edit Activity",
-        style=discord.ButtonStyle.primary
-    )
-    async def edit_activity(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-        sprint_user = (
-            self.sprint_view.participants.get_user(
-                interaction.user.id
-            )
-        )
-
-        if sprint_user is None:
-            await interaction.response.send_message(
-                "You are not in this sprint.",
-                ephemeral=True
-            )
-
-            return
-
-        modal = EditSprintActivityModal(
-            sprint_view=self.sprint_view,
-            sprint_user=sprint_user
-        )
-
-        await interaction.response.send_modal(
-            modal
-        )
