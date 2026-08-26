@@ -69,7 +69,6 @@ async def sprint(
         sprint_modal
     )
 
-
 # -------------------------------------------------------
 #                       PROFILE
 # -------------------------------------------------------
@@ -81,14 +80,6 @@ async def sprint(
 async def profile(
     interaction: discord.Interaction
 ):
-    profile_embed = create_profile_embed(
-        interaction.user
-    )
-
-    profile_view = ProfileView(
-        owner=interaction.user
-    )
-
     config = get_user_config(
         interaction.user.id
     )
@@ -100,7 +91,19 @@ async def profile(
         == "private"
     )
 
-    await interaction.response.send_message(
+    await interaction.response.defer(
+        ephemeral=is_private
+    )
+
+    profile_embed = create_profile_embed(
+        interaction.user
+    )
+
+    profile_view = ProfileView(
+        owner=interaction.user
+    )
+
+    await interaction.followup.send(
         embed=profile_embed,
         view=profile_view,
         ephemeral=is_private
@@ -116,7 +119,11 @@ async def profile(
 async def config(
     interaction: discord.Interaction
 ):
-    await interaction.response.send_message(
+    await interaction.response.defer(
+        ephemeral=True
+    )
+
+    await interaction.followup.send(
         embed=create_config_embed(
             interaction.user
         ),

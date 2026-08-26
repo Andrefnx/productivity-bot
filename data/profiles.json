@@ -491,8 +491,8 @@
             }
         },
         "config": {
-            "profile_visibility": "public",
-            "projects_visibility": "private",
+            "profile_visibility": "private",
+            "projects_visibility": "public",
             "time_format": "12h",
             "timezone": "America/Punta_Arenas"
         }
