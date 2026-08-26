@@ -41,12 +41,11 @@ from .system_messages import (
     register_active_sprint,
     remove_active_sprint
 )
-
 from .users import (
+    EditSprintActivityView,
     JoinSprintView,
     SprintParticipants
 )
-
 
 # -------------------------------------------------------
 #                CONFIRMATION VIEW
@@ -1069,4 +1068,51 @@ class SprintCreateModal(
 
         print(
             repr(error)
+        )
+        
+# -------------------------------------------------------
+#                 EDIT SPRINT ACTIVITY
+# -------------------------------------------------------
+
+    @discord.ui.button(
+        label="Edit Sprint Activity",
+        style=discord.ButtonStyle.secondary,
+        row=1
+    )
+    async def sprint_activity(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        if self.finished:
+            await interaction.response.send_message(
+                already_finished_message,
+                ephemeral=True
+            )
+
+            return
+
+        sprint_user = (
+            self.participants.get_user(
+                interaction.user.id
+            )
+        )
+
+        if sprint_user is None:
+            await interaction.response.send_message(
+                "You need to join the sprint first.",
+                ephemeral=True
+            )
+
+            return
+
+        activity_view = EditSprintActivityView(
+            sprint_view=self,
+            user_id=interaction.user.id
+        )
+
+        await interaction.response.send_message(
+            "Edit your sprint activity:",
+            view=activity_view,
+            ephemeral=True
         )

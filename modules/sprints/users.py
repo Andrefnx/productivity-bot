@@ -529,3 +529,176 @@ class JoinSprintModal(
         )
 
         await self.sprint_view.update_current_message()
+        
+        
+# -------------------------------------------------------
+#                 EDIT ACTIVITY MODAL
+# -------------------------------------------------------
+
+class EditSprintActivityModal(
+    discord.ui.Modal
+):
+    def __init__(
+        self,
+        sprint_view,
+        sprint_user: SprintUser
+    ):
+        super().__init__(
+            title="Edit Sprint Activity"
+        )
+
+        self.sprint_view = sprint_view
+        self.sprint_user = sprint_user
+
+        current_wc = (
+            str(sprint_user.initial_wc)
+            if sprint_user.initial_wc is not None
+            else ""
+        )
+
+        current_project = (
+            sprint_user.project
+            if sprint_user.project
+            else ""
+        )
+
+        self.wordcount_input = discord.ui.TextInput(
+            label="Word count",
+            default=current_wc,
+            placeholder="e.g. 1932",
+            style=discord.TextStyle.short,
+            required=False,
+            max_length=10
+        )
+
+        self.project_input = discord.ui.TextInput(
+            label="Project",
+            default=current_project,
+            placeholder="e.g. Big Bang 2026",
+            style=discord.TextStyle.short,
+            required=False,
+            max_length=100
+        )
+
+        self.add_item(
+            self.wordcount_input
+        )
+
+        self.add_item(
+            self.project_input
+        )
+
+    async def on_submit(
+        self,
+        interaction: discord.Interaction
+    ):
+        wordcount = None
+
+        if self.wordcount_input.value:
+            try:
+                wordcount = int(
+                    self.wordcount_input.value
+                )
+
+            except ValueError:
+                await interaction.response.send_message(
+                    "Word count must be a number.",
+                    ephemeral=True
+                )
+
+                return
+
+            if wordcount < 0:
+                await interaction.response.send_message(
+                    "Word count cannot be negative.",
+                    ephemeral=True
+                )
+
+                return
+
+        project = (
+            self.project_input.value.strip()
+            or None
+        )
+
+        self.sprint_user.initial_wc = wordcount
+        self.sprint_user.project = project
+
+        save_previous_sprint_data(
+            user_id=self.sprint_user.user_id,
+            initial_wc=wordcount,
+            project=project
+        )
+
+        await interaction.response.send_message(
+            "Sprint activity updated.",
+            ephemeral=True
+        )
+
+        await self.sprint_view.update_current_message()
+
+
+# -------------------------------------------------------
+#                 EDIT ACTIVITY VIEW
+# -------------------------------------------------------
+
+class EditSprintActivityView(
+    discord.ui.View
+):
+    def __init__(
+        self,
+        sprint_view,
+        user_id: int
+    ):
+        super().__init__(
+            timeout=60
+        )
+
+        self.sprint_view = sprint_view
+        self.user_id = user_id
+
+    async def interaction_check(
+        self,
+        interaction: discord.Interaction
+    ):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "This activity menu belongs to another user.",
+                ephemeral=True
+            )
+
+            return False
+
+        return True
+
+    @discord.ui.button(
+        label="Edit Activity",
+        style=discord.ButtonStyle.primary
+    )
+    async def edit_activity(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        sprint_user = (
+            self.sprint_view.participants.get_user(
+                interaction.user.id
+            )
+        )
+
+        if sprint_user is None:
+            await interaction.response.send_message(
+                "You are not in this sprint.",
+                ephemeral=True
+            )
+
+            return
+
+        modal = EditSprintActivityModal(
+            sprint_view=self.sprint_view,
+            sprint_user=sprint_user
+        )
+
+        await interaction.response.send_modal(
+            modal
+        )

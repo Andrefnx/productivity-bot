@@ -271,7 +271,7 @@ def create_results_embed(
     sorted_results
 ):
     embed = discord.Embed(
-        title=results_title
+        title="🏆 Sprint Results"
     )
 
     if not sorted_results:
@@ -285,7 +285,7 @@ def create_results_embed(
         "🥉"
     ]
 
-    result_lines = []
+    result_blocks = []
 
     for position, sprint_user in enumerate(
         sorted_results,
@@ -294,7 +294,7 @@ def create_results_embed(
         medal = (
             medals[position - 1]
             if position <= 3
-            else f"**#{position}**"
+            else f"#{position}"
         )
 
         name = sprint_user.user.display_name
@@ -306,53 +306,45 @@ def create_results_embed(
         )
 
         if sprint_user.final_wc is None:
-            total_text = "total unknown"
+            total_text = "unknown"
 
         else:
             total_text = (
-                f"{sprint_user.final_wc:,}"
+                f"{sprint_user.final_wc:,} words"
             )
 
         if sprint_user.words_written is None:
-            line = (
-                f"{medal} **{name}** finished "
-                f"✦ progress unknown "
-                f"✦ *{project}* is now "
-                f"**{total_text} words**"
+            progress_text = (
+                "Progress wasn't recorded"
             )
 
         elif sprint_user.words_written >= 0:
-            line = (
-                f"{medal} **{name}** wrote "
-                f"*+{sprint_user.words_written:,} words* "
-                f"✦ new total for *{project}* is "
-                f"**{total_text} words**"
+            progress_text = (
+                f"*+{sprint_user.words_written:,} words*"
             )
 
         else:
-            removed = abs(
-                sprint_user.words_written
+            progress_text = (
+                "There is progress... just backwards\n"
+                f"*{sprint_user.words_written:,} words*"
             )
 
-            line = (
-                f"{medal} **{name}** made progress... "
-                f"just backwards "
-                f"✦ *{project}* is "
-                f"**{removed:,} words shorter** "
-                f"✦ new total is "
-                f"**{total_text} words**"
-            )
-
-        result_lines.append(
-            line
+        block = (
+            f"{medal} **{name}**\n"
+            f"{progress_text}\n"
+            f"New total for ***{project}*** "
+            f"is **{total_text}**"
         )
 
-    embed.description = "\n".join(
-        result_lines
+        result_blocks.append(
+            block
+        )
+
+    embed.description = "\n\n".join(
+        result_blocks
     )
 
     return embed
-
 
 # -------------------------------------------------------
 #                  INTERRUPTED EMBED
