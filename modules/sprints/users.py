@@ -18,7 +18,7 @@ class SprintUser:
 
     @property
     def mention(self):
-        return self.user.mention
+        return f"<@{self.id}>"
 
 
 # -------------------------------------------------------
@@ -26,7 +26,9 @@ class SprintUser:
 # -------------------------------------------------------
 
 class SprintParticipants:
-    def __init__(self):
+    def __init__(
+        self
+    ):
         self.users = {}
 
     def add_user(
@@ -36,11 +38,9 @@ class SprintParticipants:
         if user.id in self.users:
             return False
 
-        sprint_user = SprintUser(
+        self.users[user.id] = SprintUser(
             user
         )
-
-        self.users[user.id] = sprint_user
 
         return True
 
@@ -102,7 +102,9 @@ class SprintParticipants:
             mentions
         )
 
-    def __len__(self):
+    def __len__(
+        self
+    ):
         return len(
             self.users
         )

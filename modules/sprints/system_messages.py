@@ -108,7 +108,7 @@ def remove_active_sprint(
 
 
 # -------------------------------------------------------
-#                    SPRINT EMBEDS
+#                    WAITING EMBED
 # -------------------------------------------------------
 
 def create_waiting_embed(
@@ -156,6 +156,10 @@ def create_waiting_embed(
     return embed
 
 
+# -------------------------------------------------------
+#                    STARTED EMBED
+# -------------------------------------------------------
+
 def create_started_embed(
     duration: int,
     end_timestamp: int,
@@ -184,6 +188,10 @@ def create_started_embed(
     return embed
 
 
+# -------------------------------------------------------
+#                     ENDED EMBED
+# -------------------------------------------------------
+
 def create_ended_embed(
     duration: int,
     participants_text: str
@@ -208,6 +216,10 @@ def create_ended_embed(
     return embed
 
 
+# -------------------------------------------------------
+#                   CANCELLED EMBED
+# -------------------------------------------------------
+
 def create_cancelled_embed(
     user_mention: str
 ):
@@ -219,6 +231,23 @@ def create_cancelled_embed(
         )
     )
 
+
+# -------------------------------------------------------
+#                     EMPTY EMBED
+# -------------------------------------------------------
+
+def create_empty_sprint_embed():
+    return discord.Embed(
+        title="Oh, you forgot...",
+        description=(
+            "It's okay, we all get distracted."
+        )
+    )
+
+
+# -------------------------------------------------------
+#                  INTERRUPTED EMBED
+# -------------------------------------------------------
 
 def create_interrupted_embed():
     return discord.Embed(
