@@ -12,6 +12,8 @@ from .help_messages import (
     PROJECTS_DESCRIPTION,
     PROJECTS_TITLE,
     SETTINGS_DESCRIPTION,
+        MARKETPLACE_TITLE,
+        MARKETPLACE_DESCRIPTION,
     SETTINGS_TITLE,
     SPRINTS_DESCRIPTION,
     SPRINTS_TITLE
@@ -75,6 +77,11 @@ class HelpSelect(
                 value="settings",
                 description="Privacy, timezone and preferences"
             ),
+                discord.SelectOption(
+                    label="Marketplace",
+                    value="marketplace",
+                    description="XP, coins, rewards and offers"
+                ),
             discord.SelectOption(
                 label="Imports",
                 value="imports",
@@ -164,6 +171,10 @@ class HelpView(
                 SETTINGS_TITLE,
                 SETTINGS_DESCRIPTION
             ),
+                "marketplace": (
+                    MARKETPLACE_TITLE,
+                    MARKETPLACE_DESCRIPTION
+                ),
             "imports": (
                 IMPORTS_TITLE,
                 IMPORTS_DESCRIPTION

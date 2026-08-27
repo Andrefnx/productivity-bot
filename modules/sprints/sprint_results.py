@@ -107,6 +107,7 @@ async def close_results_registration(
             return
 
         results_view.closed = True
+        await results_view.award_rewards()
         await results_view.close_registration_message()
         await results_view.send_final_results()
         results_view.stop()

@@ -12,6 +12,8 @@ import discord
 
 from modules.common.ui import WordCountChangeModal
 
+from modules.economy import award_sprint_result
+
 from .sprint_results import (
     close_results_registration,
     get_pending_results,
@@ -350,6 +352,7 @@ class SprintResultsView(
         self.participants = participants
         self.deadline_timestamp = deadline_timestamp
         self.registration_seconds = registration_seconds
+        self.sprint_duration = 0
 
         self.message = None
 
@@ -401,6 +404,8 @@ class SprintResultsView(
 
         self.closed = True
 
+        await self.award_rewards()
+
         if self.reminder_task is not None:
             self.reminder_task.cancel()
 
@@ -412,6 +417,14 @@ class SprintResultsView(
         await self.send_final_results()
 
         self.stop()
+
+    async def award_rewards(self):
+        for sprint_user in self.participants.get_users():
+            award_sprint_result(
+                sprint_user,
+                self.sprint_duration,
+                self.participants.sprint_id
+            )
 
     @discord.ui.button(
         label="Register Word Count",
@@ -553,3 +566,4 @@ async def start_results_registration(
             )
         )
     )
+    results_view.sprint_duration = duration

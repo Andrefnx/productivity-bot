@@ -103,6 +103,20 @@ PROJECTS_DESCRIPTION = (
 
 
 # -------------------------------------------------------
+#                    MARKETPLACE
+# -------------------------------------------------------
+
+MARKETPLACE_TITLE = "Marketplace"
+
+MARKETPLACE_DESCRIPTION = (
+    "Use `/market` to open the marketplace.\n\n"
+    "XP is permanent and determines your level. Coins can be spent without losing XP or levels.\n\n"
+    "Before Level 3, you can browse server rewards. Level 3 unlocks purchases, and Level 10 unlocks creating User Offers.\n\n"
+    "Server Rewards are bot-provided perks. User Offers are services offered by other server members, such as Chibi Drawing, Beta Read, or Accountability Partner."
+)
+
+
+# -------------------------------------------------------
 #                       PROFILE
 # -------------------------------------------------------
 

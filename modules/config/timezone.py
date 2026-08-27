@@ -101,7 +101,8 @@ async def get_available_timezones():
             aiohttp.ClientError,
             asyncio.TimeoutError,
             ValueError,
-            TypeError
+            TypeError,
+            OSError
         ):
             return get_cached_timezones()
 

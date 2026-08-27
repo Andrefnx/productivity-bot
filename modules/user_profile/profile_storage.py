@@ -1,6 +1,8 @@
 import json
 import os
 
+from copy import deepcopy
+
 
 # -------------------------------------------------------
 #                   PROFILE STORAGE
@@ -12,6 +14,22 @@ PROFILES_FILE = os.path.join(
     DATA_DIRECTORY,
     "profiles.json"
 )
+
+DEFAULT_PROFILE = {
+    "xp": 0,
+    "level": 1,
+    "last_project_id": None,
+    "imports": {},
+    "economy": {
+        "coins": 0,
+        "lifetime_xp": 0,
+        "lifetime_coins": 0,
+        "sprints_rewarded": 0,
+        "transactions": [],
+        "migrations": {},
+        "sprint_rewards": {}
+    }
+}
 
 
 def load_profiles():
@@ -71,21 +89,28 @@ def get_profile(
         user_id
     )
 
+    changed = False
+
     if user_key not in profiles:
-        profiles[user_key] = {
-            "xp": 0,
-            "level": 0,
-            "last_project_id": None,
-            "imports": {}
-        }
+        profiles[user_key] = deepcopy(DEFAULT_PROFILE)
+        changed = True
 
-        save_profiles(
-            profiles
+    profile = profiles[user_key]
+    if "economy" not in profile:
+        profile["economy"] = deepcopy(
+            DEFAULT_PROFILE["economy"]
         )
+        changed = True
+    else:
+        for key, value in DEFAULT_PROFILE["economy"].items():
+            if key not in profile["economy"]:
+                profile["economy"][key] = deepcopy(value)
+                changed = True
 
-    return profiles[
-        user_key
-    ]
+    if changed:
+        save_profiles(profiles)
+
+    return profile
 
 
 def update_profile(
@@ -100,12 +125,7 @@ def update_profile(
 
     profile = profiles.get(
         user_key,
-        {
-            "xp": 0,
-            "level": 0,
-            "last_project_id": None,
-            "imports": {}
-        }
+        deepcopy(DEFAULT_PROFILE)
     )
 
     profile.update(

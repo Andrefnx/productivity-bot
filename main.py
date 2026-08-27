@@ -25,6 +25,11 @@ from modules.help import (
     HelpView,
     create_help_embed
 )
+
+from modules.marketplace import (
+    MarketplaceView,
+    get_marketplace_config
+)
 #-------------------------------------------------------
 #                       SETUP  
 #-------------------------------------------------------
@@ -146,6 +151,38 @@ async def config(
         ephemeral=True
     )
 
+
+# -------------------------------------------------------
+#                    MARKETPLACE
+# -------------------------------------------------------
+
+@tree.command(
+    name="market",
+    description="Open the marketplace"
+)
+async def market(
+    interaction: discord.Interaction
+):
+    config = get_marketplace_config(
+        interaction.guild_id
+    )
+    if not config["marketplace_enabled"]:
+        await interaction.response.send_message(
+            "Marketplace is disabled in this server.",
+            ephemeral=True
+        )
+        return
+
+    view = MarketplaceView(
+        interaction.user
+    )
+
+    await interaction.response.send_message(
+        embed=view.embed(interaction),
+        view=view,
+        ephemeral=True
+    )
+
 # -------------------------------------------------------
 #                        HELP
 # -------------------------------------------------------
@@ -204,6 +241,7 @@ async def on_ready():
     )
 
 
-client.run(
-    token
-)
+if __name__ == "__main__":
+    client.run(
+        token
+    )

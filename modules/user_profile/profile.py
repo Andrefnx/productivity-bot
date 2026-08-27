@@ -46,6 +46,12 @@ def get_last_project(
 def create_profile_embed(
     user
 ):
+    from modules.economy import (
+        calculate_level,
+        get_coins,
+        get_xp_progress
+    )
+
     profile = get_profile(
         user.id
     )
@@ -67,8 +73,20 @@ def create_profile_embed(
     )
 
     embed.add_field(
-        name="EXP",
-        value="Still in development",
+        name="Level",
+        value=(
+            f"{calculate_level(profile.get('xp', 0))} ✦ "
+            f"{get_xp_progress(profile.get('xp', 0))} / 100 XP"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="Balance",
+        value=(
+            f"Total XP ✦ {profile.get('xp', 0)}\n"
+            f"Coins ✦ {get_coins(user.id)}"
+        ),
         inline=False
     )
 

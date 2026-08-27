@@ -495,6 +495,15 @@
             "projects_visibility": "public",
             "time_format": "12h",
             "timezone": "America/Punta_Arenas"
+        },
+        "economy": {
+            "coins": 0,
+            "lifetime_xp": 0,
+            "lifetime_coins": 0,
+            "sprints_rewarded": 0,
+            "transactions": [],
+            "migrations": {},
+            "sprint_rewards": {}
         }
     }
 }

@@ -5,6 +5,8 @@ from modules.user_profile.profile_storage import (
     save_profiles
 )
 
+from modules.economy import calculate_level
+
 from modules.user_profile.projects.project_list import (
     load_projects,
     save_projects
@@ -204,25 +206,28 @@ def import_writer_bot_profile(
         }
     )
 
-    profile[
-        "xp"
-    ] = data.get(
+    writer_level = data.get(
+        "level"
+    )
+    writer_xp = data.get(
         "xp",
-        profile.get(
-            "xp",
-            0
-        )
+        0
     )
 
-    profile[
-        "level"
-    ] = data.get(
-        "level",
-        profile.get(
-            "level",
-            0
+    if writer_level is not None:
+        writer_level = max(
+            1,
+            int(writer_level)
         )
-    )
+        profile["level"] = writer_level
+        profile["xp"] = (
+            writer_level - 1
+        ) * 100
+    else:
+        profile["xp"] = int(writer_xp or 0)
+        profile["level"] = calculate_level(
+            profile["xp"]
+        )
 
     imports = profile.get(
         "imports",
@@ -259,12 +264,71 @@ def import_writer_bot_profile(
                 "goals"
             )
         },
+        "migration": {
+            "legacy_xp": writer_xp,
+            "legacy_level": writer_level,
+            "sprint_words": data.get("sprint_words"),
+            "sprint_count": data.get("sprint_count"),
+            "sprints_won": data.get("sprints_won")
+        },
         "raw": data
     }
 
-    profile[
-        "imports"
-    ] = imports
+    economy = profile.setdefault(
+        "economy",
+        {
+            "coins": 0,
+            "transactions": [],
+            "migrations": {}
+        }
+    )
+    migrations = economy.setdefault(
+        "migrations",
+        {}
+    )
+    if "writer_bot" not in migrations:
+        sprint_words = int(data.get("sprint_words") or 0)
+        sprint_count = int(data.get("sprint_count") or 0)
+        sprints_won = int(data.get("sprints_won") or data.get("wins") or 0)
+        converted_coins = (
+            sprint_words // 1000
+            + sprint_count // 10
+            + sprints_won // 5
+        )
+        economy["coins"] = int(
+            economy.get("coins", 0)
+        ) + converted_coins
+        economy["lifetime_xp"] = max(
+            int(economy.get("lifetime_xp", 0)),
+            int(profile["xp"])
+        )
+        economy.setdefault(
+            "transactions",
+            []
+        ).append({
+            "transaction_id": f"writer_bot:{user_id}",
+            "user_id": user_id,
+            "type": "writer_bot_migration",
+            "amount": converted_coins,
+            "balance_before": int(
+                economy.get("coins", 0)
+            ) - converted_coins,
+            "balance_after": int(
+                economy.get("coins", 0)
+            ),
+            "source": "writer_bot_migration",
+            "related_id": user_id,
+            "timestamp": datetime.now().timestamp()
+        })
+        migrations["writer_bot"] = {
+            "converted_coins": converted_coins,
+            "source_xp": writer_xp,
+            "source_level": writer_level,
+            "converted_at": datetime.now().isoformat()
+        }
+
+    profile["economy"] = economy
+    profile["imports"] = imports
 
     profiles[
         user_key
