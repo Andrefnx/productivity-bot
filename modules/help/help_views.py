@@ -200,7 +200,7 @@ class HelpView(
 # -------------------------------------------------------
 
     @discord.ui.button(
-        label="Back to Help",
+        label="↩ Back to Help",
         style=discord.ButtonStyle.secondary,
         row=1
     )

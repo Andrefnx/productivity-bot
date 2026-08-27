@@ -133,15 +133,59 @@ class ProfileView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
-        view = UserProjectsView(
+        from modules.config import (
+            get_user_config
+        )
+
+        from modules.user_profile.projects import (
+            UserProjectsView
+        )
+
+        config = get_user_config(
+            self.owner.id
+        )
+
+        projects_private = (
+            config[
+                "projects_visibility"
+            ]
+            == "private"
+        )
+
+        projects_view = UserProjectsView(
             owner=self.owner
         )
 
-        await interaction.response.edit_message(
-            embed=view.create_current_embed(),
-            view=view
+        projects_embed = (
+            projects_view.create_current_embed()
         )
 
+        if projects_private:
+            await interaction.response.send_message(
+                embed=projects_embed,
+                view=projects_view,
+                ephemeral=True
+            )
+
+            return
+
+        await interaction.response.defer()
+
+        try:
+            await interaction.message.delete()
+
+        except (
+            discord.NotFound,
+            discord.Forbidden,
+            discord.HTTPException
+        ):
+            pass
+
+        await interaction.followup.send(
+            embed=projects_embed,
+            view=projects_view,
+            ephemeral=False
+        )
 # -------------------------------------------------------
 #                    IMPORT JSON
 # -------------------------------------------------------

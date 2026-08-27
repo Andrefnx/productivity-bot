@@ -119,3 +119,21 @@ def parse_date_only(
         ).strftime("%d-%m-%Y")
     except ValueError:
         return False
+
+
+# -------------------------------------------------------
+#                 TIME FORMAT VALIDATION
+# -------------------------------------------------------
+
+def parse_time_format(
+    value: str
+):
+    value = (value or "").strip().lower()
+
+    if value not in (
+        "12h",
+        "24h"
+    ):
+        return None, "Time format must be `12h` or `24h`."
+
+    return value, None

@@ -3,6 +3,7 @@ from .validation import (
     parse_date_only,
     parse_non_negative_integer,
     parse_positive_integer,
+    parse_time_format,
     validate_word_count_change
 )
 
@@ -11,5 +12,6 @@ __all__ = [
     "parse_date_only",
     "parse_non_negative_integer",
     "parse_positive_integer",
+    "parse_time_format",
     "validate_word_count_change"
 ]

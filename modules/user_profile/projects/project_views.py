@@ -724,10 +724,14 @@ class ProjectDetailView(
             )
         )
 
+# -------------------------------------------------------
+#                  BACK TO PROFILE
+# -------------------------------------------------------
+
     @discord.ui.button(
         label="Back to Profile",
         style=discord.ButtonStyle.secondary,
-        row=1
+        row=4
     )
     async def back_profile(
         self,
@@ -739,13 +743,26 @@ class ProjectDetailView(
             create_profile_embed
         )
 
-        await interaction.response.edit_message(
+        await interaction.response.defer()
+
+        try:
+            await interaction.message.delete()
+
+        except (
+            discord.NotFound,
+            discord.Forbidden,
+            discord.HTTPException
+        ):
+            pass
+
+        await interaction.followup.send(
             embed=create_profile_embed(
                 self.owner
             ),
             view=ProfileView(
                 owner=self.owner
-            )
+            ),
+            ephemeral=True
         )
 
 

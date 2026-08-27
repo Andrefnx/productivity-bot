@@ -20,14 +20,17 @@ from .permissions import (
     can_edit_channel_config,
     can_edit_sprint_settings,
     can_manage_sprint_action,
-    can_view_profile,
-    can_view_projects,
     is_administrator,
     is_moderator,
     resolve_setting,
     resolve_sprint_config,
     resolve_empty_sprint_timeout,
     resolve_sprint_setting
+)
+
+from .visibility import (
+    can_view_profile,
+    can_view_projects
 )
 
 from .channel.channel_config import (

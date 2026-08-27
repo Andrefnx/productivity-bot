@@ -1,5 +1,7 @@
 import discord
 
+from modules.common.validation import parse_time_format
+
 from .config_data import (
     get_user_config,
     update_user_config
@@ -165,15 +167,13 @@ class DateTimeSettingsModal(
             .lower()
         )
 
-        if time_format not in (
-            "12h",
-            "24h"
-        ):
+        time_format, error = parse_time_format(
+            time_format
+        )
+
+        if error:
             await interaction.response.send_message(
-                (
-                    "Time format must be "
-                    "`12h` or `24h`."
-                ),
+                error,
                 ephemeral=True
             )
 

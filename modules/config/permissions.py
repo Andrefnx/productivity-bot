@@ -1,6 +1,3 @@
-from .config_data import get_user_config
-
-
 # -------------------------------------------------------
 #                 DISCORD PERMISSIONS
 # -------------------------------------------------------
@@ -111,40 +108,6 @@ def can_edit_sprint_settings(
 		member.id == creator_id
 		or is_moderator(member)
 	)
-
-
-def can_view_profile(
-	owner,
-	viewer,
-	guild=None
-):
-	if owner.id == viewer.id:
-		return True
-
-	config = get_user_config(
-		owner.id
-	)
-
-	return config[
-		"profile_visibility"
-	] == "public"
-
-
-def can_view_projects(
-	owner,
-	viewer,
-	guild=None
-):
-	if owner.id == viewer.id:
-		return True
-
-	config = get_user_config(
-		owner.id
-	)
-
-	return config[
-		"projects_visibility"
-	] == "public"
 
 
 # -------------------------------------------------------
