@@ -6,6 +6,7 @@ from .user.user_config import (
 
 from .user.user_views import (
     ConfigView,
+    DateTimeSettingsView,
     create_config_embed
 )
 
@@ -60,6 +61,7 @@ from .sprint.sprint_views import (
 __all__ = [
     "DEFAULT_CONFIG",
     "ConfigView",
+    "DateTimeSettingsView",
     "ConfigMenuView",
     "ChannelConfigView",
     "DEFAULT_CHANNEL_CONFIG",

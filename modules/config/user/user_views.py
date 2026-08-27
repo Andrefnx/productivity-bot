@@ -1,5 +1,6 @@
 from ..config_views import (
     ConfigView,
+    DateTimeSettingsView,
     DateTimeSettingsModal,
     TimezoneResultSelect,
     TimezoneResultsView,
@@ -9,6 +10,7 @@ from ..config_views import (
 
 __all__ = [
     "ConfigView",
+    "DateTimeSettingsView",
     "DateTimeSettingsModal",
     "TimezoneResultSelect",
     "TimezoneResultsView",

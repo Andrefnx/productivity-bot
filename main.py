@@ -16,7 +16,9 @@ from modules.user_profile import (
     create_profile_embed
 )
 from modules.config import (
-    ConfigMenuView
+    ConfigMenuView,
+    can_create_sprint,
+    get_channel_config
 )
 
 from modules.help import (
@@ -66,7 +68,25 @@ startup_recovery_done = False
 async def sprint(
     interaction: discord.Interaction
 ):
-    sprint_modal = SprintCreateModal()
+    channel_config = get_channel_config(
+        interaction.guild_id,
+        interaction.channel_id
+    )
+
+    if not can_create_sprint(
+        interaction.user,
+        channel_config["create_sprints"]
+    ):
+        await interaction.response.send_message(
+            "You do not have permission to create sprints in this channel.",
+            ephemeral=True
+        )
+        return
+
+    sprint_modal = SprintCreateModal(
+        default_duration=channel_config["default_duration"],
+        default_start_waiting_time=channel_config["start_waiting_time"]
+    )
 
     await interaction.response.send_modal(
         sprint_modal
@@ -117,7 +137,7 @@ async def config(
 
     await interaction.followup.send(
         embed=discord.Embed(
-            title="Configuration",
+            title="Settings",
             description="Choose User Settings or Channel Settings."
         ),
         view=ConfigMenuView(

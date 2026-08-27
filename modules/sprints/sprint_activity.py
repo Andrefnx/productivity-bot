@@ -13,8 +13,6 @@ import discord
 from modules.common.ui import WordCountChangeModal
 
 from .sprint_results import (
-    RESULT_REGISTRATION_SECONDS,
-    RESULT_REMINDER_SECONDS,
     close_results_registration,
     get_pending_results,
     get_sorted_results,
@@ -342,7 +340,8 @@ class SprintResultsView(
     def __init__(
         self,
         participants,
-        deadline_timestamp
+        deadline_timestamp,
+        registration_seconds=600
     ):
         super().__init__(
             timeout=None
@@ -350,6 +349,7 @@ class SprintResultsView(
 
         self.participants = participants
         self.deadline_timestamp = deadline_timestamp
+        self.registration_seconds = registration_seconds
 
         self.message = None
 
@@ -494,7 +494,8 @@ class SprintResultsView(
 async def start_results_registration(
     channel,
     duration,
-    participants
+    participants,
+    registration_seconds=600
 ):
     mentions = (
         participants.get_ping_text()
@@ -505,12 +506,13 @@ async def start_results_registration(
 
     deadline_timestamp = int(
         time.time()
-        + RESULT_REGISTRATION_SECONDS
+        + registration_seconds
     )
 
     results_view = SprintResultsView(
         participants=participants,
-        deadline_timestamp=deadline_timestamp
+        deadline_timestamp=deadline_timestamp,
+        registration_seconds=registration_seconds
     )
 
     finished_embed = create_finished_embed(

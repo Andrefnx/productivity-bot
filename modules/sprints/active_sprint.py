@@ -149,6 +149,10 @@ class SprintView(
         self.sprint_config = create_sprint_config(
             sprint_config
         )
+        self.word_count_waiting_seconds = (
+            self.channel_config["word_count_waiting_time"]
+            * 60
+        )
 
         self.message = None
         self.sprint_timer = None
@@ -471,7 +475,8 @@ class SprintView(
         await start_results_registration(
             channel=channel,
             duration=self.duration,
-            participants=finished_participants
+            participants=finished_participants,
+            registration_seconds=self.word_count_waiting_seconds
         )
 
         self.stop()
@@ -570,10 +575,15 @@ class SprintView(
         self,
         interaction: discord.Interaction
     ):
+        channel_config = get_channel_config(
+            self.guild_id,
+            self.channel_id
+        )
+
         if not can_manage_sprint_action(
             interaction.user,
             self.creator_id,
-            self.channel_config["cancel_sprints"]
+            channel_config["cancel_sprints"]
         ):
             await interaction.response.send_message(
                 "You do not have permission to cancel this sprint.",
@@ -731,10 +741,15 @@ class SprintView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
+        channel_config = get_channel_config(
+            self.guild_id,
+            self.channel_id
+        )
+
         if not can_manage_sprint_action(
             interaction.user,
             self.creator_id,
-            self.channel_config["cancel_sprints"]
+            channel_config["cancel_sprints"]
         ):
             await interaction.response.send_message(
                 "You do not have permission to cancel this sprint.",
@@ -775,10 +790,15 @@ class SprintView(
 
             return
 
+        channel_config = get_channel_config(
+            self.guild_id,
+            self.channel_id
+        )
+
         if not can_manage_sprint_action(
             interaction.user,
             self.creator_id,
-            self.channel_config["change_sprint_time"]
+            channel_config["change_sprint_time"]
         ):
             await interaction.response.send_message(
                 "You do not have permission to change this sprint's time.",
@@ -1114,13 +1134,6 @@ class SprintTimeModal(
             )
             return
 
-        if not self.sprint_view.started and starts_in > self.sprint_view.channel_config["max_waiting_time"]:
-            await interaction.response.send_message(
-                "Waiting time exceeds the channel limit.",
-                ephemeral=True
-            )
-            return
-
         if not self.sprint_view.started and not resolve_sprint_setting(
             "allow_change_waiting_time",
             self.sprint_view.channel_config,
@@ -1168,7 +1181,9 @@ class SprintCreateModal(
     discord.ui.Modal
 ):
     def __init__(
-        self
+        self,
+        default_duration=30,
+        default_start_waiting_time=10
     ):
         super().__init__(
             title="Create a Sprint"
@@ -1176,6 +1191,7 @@ class SprintCreateModal(
 
         self.duration_input = discord.ui.TextInput(
             label="Duration (minutes)",
+            default=str(default_duration),
             placeholder="e.g. 30",
             style=discord.TextStyle.short,
             required=True,
@@ -1184,6 +1200,7 @@ class SprintCreateModal(
 
         self.starts_in_input = discord.ui.TextInput(
             label="Starts in (minutes)",
+            default=str(default_start_waiting_time),
             placeholder="e.g. 10",
             style=discord.TextStyle.short,
             required=False,
@@ -1227,7 +1244,7 @@ class SprintCreateModal(
                     self.starts_in_input.value
                 )
                 if self.starts_in_input.value
-                else channel_config["default_waiting_time"]
+                else channel_config["start_waiting_time"]
             )
 
         except ValueError:
@@ -1242,7 +1259,6 @@ class SprintCreateModal(
             duration < channel_config["min_duration"]
             or duration > channel_config["max_duration"]
             or starts_in < 0
-            or starts_in > channel_config["max_waiting_time"]
         ):
             await interaction.response.send_message(
                 create_time_invalid_message,

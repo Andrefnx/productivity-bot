@@ -18,10 +18,17 @@ DEFAULT_CHANNEL_CONFIG = {
 	"default_duration": 30,
 	"min_duration": 1,
 	"max_duration": 180,
-	"default_waiting_time": 10,
-	"max_waiting_time": 30,
+	"start_waiting_time": 10,
+	"word_count_waiting_time": 10,
 	"cancel_empty_sprints": True,
 	"empty_sprint_timeout": 10
+}
+
+LEGACY_SETTING_KEYS = {
+	"default_waiting_time": "start_waiting_time",
+	"default_start_waiting_time": "start_waiting_time",
+	"max_waiting_time": None,
+	"max_start_waiting_time": None
 }
 
 CHANNEL_CONFIG_PATH = (
@@ -79,9 +86,13 @@ def get_channel_config(
 	)
 
 	config = DEFAULT_CHANNEL_CONFIG.copy()
-	config.update(
-		saved_config
-	)
+	for key, value in saved_config.items():
+		mapped_key = LEGACY_SETTING_KEYS.get(
+			key,
+			key
+		)
+		if mapped_key in config:
+			config[mapped_key] = value
 
 	return config
 
@@ -92,6 +103,11 @@ def update_channel_config(
 	key: str,
 	value
 ):
+	key = LEGACY_SETTING_KEYS.get(
+		key,
+		key
+	)
+
 	if key not in DEFAULT_CHANNEL_CONFIG:
 		raise KeyError(
 			f"Unknown channel config key: {key}"

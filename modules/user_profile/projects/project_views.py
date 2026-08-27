@@ -20,6 +20,42 @@ from .project_modals import (
 
 
 # -------------------------------------------------------
+#                  PROFILE NAVIGATION
+# -------------------------------------------------------
+
+async def send_private_profile(
+    interaction,
+    owner
+):
+    from modules.user_profile.profile import (
+        ProfileView,
+        create_profile_embed
+    )
+
+    await interaction.response.defer()
+
+    try:
+        await interaction.message.delete()
+
+    except (
+        discord.NotFound,
+        discord.Forbidden,
+        discord.HTTPException
+    ):
+        pass
+
+    await interaction.followup.send(
+        embed=create_profile_embed(
+            owner
+        ),
+        view=ProfileView(
+            owner=owner
+        ),
+        ephemeral=True
+    )
+
+
+# -------------------------------------------------------
 #                   PROJECT SELECT
 # -------------------------------------------------------
 
@@ -341,7 +377,7 @@ class CreateProjectView(
         )
 
     @discord.ui.button(
-        label="Back",
+        label="↩ Back",
         style=discord.ButtonStyle.secondary,
         row=1
     )
@@ -706,7 +742,7 @@ class ProjectDetailView(
         )
 
     @discord.ui.button(
-        label="Back to Projects",
+        label="↩ Back to Projects",
         style=discord.ButtonStyle.secondary,
         row=1
     )
@@ -729,7 +765,7 @@ class ProjectDetailView(
 # -------------------------------------------------------
 
     @discord.ui.button(
-        label="Back to Profile",
+        label="↩Back to Profile",
         style=discord.ButtonStyle.secondary,
         row=4
     )
@@ -738,31 +774,9 @@ class ProjectDetailView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
-        from modules.user_profile.profile import (
-            ProfileView,
-            create_profile_embed
-        )
-
-        await interaction.response.defer()
-
-        try:
-            await interaction.message.delete()
-
-        except (
-            discord.NotFound,
-            discord.Forbidden,
-            discord.HTTPException
-        ):
-            pass
-
-        await interaction.followup.send(
-            embed=create_profile_embed(
-                self.owner
-            ),
-            view=ProfileView(
-                owner=self.owner
-            ),
-            ephemeral=True
+        await send_private_profile(
+            interaction,
+            self.owner
         )
 
 
@@ -1053,7 +1067,7 @@ class UserProjectsView(
         )
 
     @discord.ui.button(
-        label="Back to Profile",
+        label="↩Back to Profile",
         style=discord.ButtonStyle.secondary,
         row=4
     )
@@ -1062,16 +1076,7 @@ class UserProjectsView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
-        from modules.user_profile.profile import (
-            ProfileView,
-            create_profile_embed
-        )
-
-        await interaction.response.edit_message(
-            embed=create_profile_embed(
-                self.owner
-            ),
-            view=ProfileView(
-                owner=self.owner
-            )
+        await send_private_profile(
+            interaction,
+            self.owner
         )

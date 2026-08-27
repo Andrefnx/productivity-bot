@@ -8,8 +8,309 @@ from .config_data import (
 )
 
 from .timezone import (
+    get_available_timezones,
+    get_cached_timezones,
+    get_region_timezones,
+    get_timezone_regions,
     search_timezones
 )
+
+
+# -------------------------------------------------------
+#                 DATE AND TIME SELECTS
+# -------------------------------------------------------
+
+class TimeFormatSelect(
+    discord.ui.Select
+):
+    def __init__(
+        self,
+        settings_view
+    ):
+        self.settings_view = settings_view
+
+        super().__init__(
+            placeholder="Select time format",
+            options=[
+                discord.SelectOption(
+                    label="12-hour",
+                    value="12h",
+                    default=(
+                        settings_view.selected_time_format
+                        == "12h"
+                    )
+                ),
+                discord.SelectOption(
+                    label="24-hour",
+                    value="24h",
+                    default=(
+                        settings_view.selected_time_format
+                        == "24h"
+                    )
+                )
+            ],
+            row=0
+        )
+
+    async def callback(
+        self,
+        interaction: discord.Interaction
+    ):
+        self.settings_view.selected_time_format = self.values[0]
+        await interaction.response.edit_message(
+            embed=self.settings_view.create_embed(),
+            view=self.settings_view
+        )
+
+
+class TimezoneRegionSelect(
+    discord.ui.Select
+):
+    def __init__(
+        self,
+        settings_view
+    ):
+        self.settings_view = settings_view
+
+        super().__init__(
+            placeholder="Select timezone region",
+            options=[
+                discord.SelectOption(
+                    label=region,
+                    value=region,
+                    default=(region == settings_view.selected_region)
+                )
+                for region in get_timezone_regions(
+                    settings_view.timezones
+                )
+            ],
+            row=1
+        )
+
+    async def callback(
+        self,
+        interaction: discord.Interaction
+    ):
+        self.settings_view.selected_region = self.values[0]
+        self.settings_view.page = 0
+        self.settings_view.selected_timezone = get_region_timezones(
+            self.settings_view.selected_region,
+            self.settings_view.timezones
+        )[0]
+        self.settings_view.build_components()
+
+        await interaction.response.edit_message(
+            embed=self.settings_view.create_embed(),
+            view=self.settings_view
+        )
+
+
+class TimezoneSelect(
+    discord.ui.Select
+):
+    def __init__(
+        self,
+        settings_view
+    ):
+        self.settings_view = settings_view
+        timezones = get_region_timezones(
+            settings_view.selected_region,
+            settings_view.timezones
+        )
+        start = settings_view.page * 25
+        page_timezones = timezones[start:start + 25]
+
+        super().__init__(
+            placeholder="Select timezone",
+            options=[
+                discord.SelectOption(
+                    label=timezone.replace(
+                        "_",
+                        " "
+                    )[-100:],
+                    value=timezone,
+                    default=(timezone == settings_view.selected_timezone)
+                )
+                for timezone in page_timezones
+            ],
+            row=2
+        )
+
+    async def callback(
+        self,
+        interaction: discord.Interaction
+    ):
+        self.settings_view.selected_timezone = self.values[0]
+        await interaction.response.edit_message(
+            embed=self.settings_view.create_embed(),
+            view=self.settings_view
+        )
+
+
+# -------------------------------------------------------
+#                 DATE AND TIME SETTINGS
+# -------------------------------------------------------
+
+class DateTimeSettingsView(
+    discord.ui.View
+):
+    def __init__(
+        self,
+        config_view,
+        timezones=None
+    ):
+        super().__init__(
+            timeout=180
+        )
+        self.config_view = config_view
+        self.timezones = list(
+            timezones or get_cached_timezones()
+        )
+        config = get_user_config(
+            config_view.owner.id
+        )
+        self.selected_time_format = config.get(
+            "time_format",
+            "12h"
+        )
+        self.selected_timezone = config.get(
+            "timezone",
+            "America/Punta_Arenas"
+        )
+        self.selected_region = (
+            self.selected_timezone.split("/")[0]
+            if "/" in self.selected_timezone
+            else "Other"
+        )
+        regions = get_timezone_regions(
+            self.timezones
+        )
+        if self.selected_region not in regions:
+            self.selected_region = regions[0]
+            self.selected_timezone = get_region_timezones(
+                self.selected_region,
+                self.timezones
+            )[0]
+        region_timezones = get_region_timezones(
+            self.selected_region,
+            self.timezones
+        )
+        self.page = (
+            region_timezones.index(
+                self.selected_timezone
+            ) // 25
+            if self.selected_timezone in region_timezones
+            else 0
+        )
+        self.build_components()
+
+    def create_embed(self):
+        return discord.Embed(
+            title="Date & Time",
+            description=(
+                f"Timezone: `{self.selected_timezone}`\n"
+                f"Time format: `{self.selected_time_format}`"
+            )
+        )
+
+    def build_components(self):
+        self.clear_items()
+        self.add_item(TimeFormatSelect(self))
+        self.add_item(TimezoneRegionSelect(self))
+        self.add_item(TimezoneSelect(self))
+
+        timezones = get_region_timezones(
+            self.selected_region,
+            self.timezones
+        )
+        self.previous_page.disabled = self.page <= 0
+        self.next_page.disabled = (
+            (self.page + 1) * 25 >= len(timezones)
+        )
+        self.add_item(self.previous_page)
+        self.add_item(self.next_page)
+        self.add_item(self.save)
+        self.add_item(self.back_settings)
+
+    @discord.ui.button(
+        label="◀",
+        style=discord.ButtonStyle.secondary,
+        row=3
+    )
+    async def previous_page(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        self.page -= 1
+        self.build_components()
+        await interaction.response.edit_message(
+            embed=self.create_embed(),
+            view=self
+        )
+
+    @discord.ui.button(
+        label="▶",
+        style=discord.ButtonStyle.secondary,
+        row=3
+    )
+    async def next_page(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        self.page += 1
+        self.build_components()
+        await interaction.response.edit_message(
+            embed=self.create_embed(),
+            view=self
+        )
+
+    @discord.ui.button(
+        label="Save",
+        style=discord.ButtonStyle.success,
+        row=4
+    )
+    async def save(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        update_user_config(
+            self.config_view.owner.id,
+            "timezone",
+            self.selected_timezone
+        )
+        update_user_config(
+            self.config_view.owner.id,
+            "time_format",
+            self.selected_time_format
+        )
+        self.config_view.build_components()
+        await interaction.response.edit_message(
+            embed=create_config_embed(
+                self.config_view.owner
+            ),
+            view=self.config_view
+        )
+
+    @discord.ui.button(
+        label="↩ Back to Settings",
+        style=discord.ButtonStyle.secondary,
+        row=4
+    )
+    async def back_settings(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        self.config_view.build_components()
+        await interaction.response.edit_message(
+            embed=create_config_embed(
+                self.config_view.owner
+            ),
+            view=self.config_view
+        )
 
 
 # -------------------------------------------------------
@@ -179,7 +480,7 @@ class DateTimeSettingsModal(
 
             return
 
-        results = search_timezones(
+        results = await search_timezones(
             timezone_search
         )
 
@@ -497,6 +798,10 @@ class ConfigView(
             self.back_profile
         )
 
+        self.add_item(
+            self.back_settings
+        )
+
     async def interaction_check(
         self,
         interaction: discord.Interaction
@@ -620,10 +925,23 @@ class ConfigView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
-        await interaction.response.send_modal(
-            DateTimeSettingsModal(
-                config_view=self
+        timezones = await get_available_timezones()
+
+        if not timezones:
+            await interaction.response.send_message(
+                "Timezone data is temporarily unavailable. Try again later.",
+                ephemeral=True
             )
+            return
+
+        date_time_view = DateTimeSettingsView(
+            config_view=self,
+            timezones=timezones
+        )
+
+        await interaction.response.edit_message(
+            embed=date_time_view.create_embed(),
+            view=date_time_view
         )
 
 
@@ -651,6 +969,33 @@ class ConfigView(
                 self.owner
             ),
             view=ProfileView(
+                owner=self.owner
+            )
+        )
+
+
+# -------------------------------------------------------
+#                  BACK TO SETTINGS
+# -------------------------------------------------------
+
+    @discord.ui.button(
+        label="↩ Back to Settings",
+        style=discord.ButtonStyle.secondary,
+        row=3
+    )
+    async def back_settings(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        from modules.config.config_menu import ConfigMenuView
+
+        await interaction.response.edit_message(
+            embed=discord.Embed(
+                title="Settings",
+                description="Choose User Settings or Channel Settings."
+            ),
+            view=ConfigMenuView(
                 owner=self.owner
             )
         )

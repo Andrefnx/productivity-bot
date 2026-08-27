@@ -6,8 +6,8 @@ import discord
 from .system_messages import create_results_embed
 
 
-RESULT_REGISTRATION_SECONDS = 600
-RESULT_REMINDER_SECONDS = 120
+WORD_COUNT_REGISTRATION_SECONDS = 600
+WORD_COUNT_REMINDER_SECONDS = 120
 
 
 # -------------------------------------------------------
@@ -57,8 +57,11 @@ async def send_result_reminder(
 ):
     try:
         await asyncio.sleep(
-            RESULT_REGISTRATION_SECONDS
-            - RESULT_REMINDER_SECONDS
+            results_view.registration_seconds
+            - min(
+                WORD_COUNT_REMINDER_SECONDS,
+                results_view.registration_seconds
+            )
         )
 
         if results_view.closed:
@@ -97,7 +100,7 @@ async def close_results_registration(
 ):
     try:
         await asyncio.sleep(
-            RESULT_REGISTRATION_SECONDS
+            results_view.registration_seconds
         )
 
         if results_view.closed:
