@@ -187,8 +187,8 @@ class DateTimeSettingsModal(
             await interaction.response.send_message(
                 (
                     "Timezone not found.\n\n"
-                    "Try `America/Punta_Arenas`, "
-                    "`Punta Arenas`, `Santiago` "
+                    "Try `America/Buenos Aires`, "
+                    "'New York', `Santiago` "
                     "or `Tokyo`."
                 ),
                 ephemeral=True

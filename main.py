@@ -16,14 +16,13 @@ from modules.user_profile import (
     create_profile_embed
 )
 from modules.config import (
-    ConfigView,
-    create_config_embed
+    ConfigMenuView
 )
 
-from modules.config import (
-    get_user_config
+from modules.help import (
+    HelpView,
+    create_help_embed
 )
-
 #-------------------------------------------------------
 #                       SETUP  
 #-------------------------------------------------------
@@ -56,6 +55,10 @@ startup_recovery_done = False
 #                       COMMANDS
 # -------------------------------------------------------
 
+# -------------------------------------------------------
+#                       SPRINT
+# -------------------------------------------------------
+
 @tree.command(
     name="sprint",
     description="Start a writing sprint"
@@ -70,7 +73,7 @@ async def sprint(
     )
 
 # -------------------------------------------------------
-#                       PROFILE
+#                      PROFILE
 # -------------------------------------------------------
 
 @tree.command(
@@ -80,19 +83,8 @@ async def sprint(
 async def profile(
     interaction: discord.Interaction
 ):
-    config = get_user_config(
-        interaction.user.id
-    )
-
-    is_private = (
-        config[
-            "profile_visibility"
-        ]
-        == "private"
-    )
-
     await interaction.response.defer(
-        ephemeral=is_private
+        ephemeral=True
     )
 
     profile_embed = create_profile_embed(
@@ -106,7 +98,7 @@ async def profile(
     await interaction.followup.send(
         embed=profile_embed,
         view=profile_view,
-        ephemeral=is_private
+        ephemeral=True
     )
 # -------------------------------------------------------
 #                       CONFIG
@@ -124,15 +116,34 @@ async def config(
     )
 
     await interaction.followup.send(
-        embed=create_config_embed(
-            interaction.user
+        embed=discord.Embed(
+            title="Configuration",
+            description="Choose User Settings or Channel Settings."
         ),
-        view=ConfigView(
+        view=ConfigMenuView(
             owner=interaction.user
         ),
         ephemeral=True
     )
 
+# -------------------------------------------------------
+#                        HELP
+# -------------------------------------------------------
+
+@tree.command(
+    name="help",
+    description="Learn how to use the bot"
+)
+async def help_command(
+    interaction: discord.Interaction
+):
+    await interaction.response.send_message(
+        embed=create_help_embed(),
+        view=HelpView(
+            owner=interaction.user
+        ),
+        ephemeral=True
+    )
 # -------------------------------------------------------
 #                  DISCORD CONNECTION
 # -------------------------------------------------------

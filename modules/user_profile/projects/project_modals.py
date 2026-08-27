@@ -1,12 +1,17 @@
 import discord
 
+from modules.common.validation import (
+    parse_date_only,
+    parse_non_negative_integer,
+    parse_positive_integer
+)
+
 from .project_list import (
     create_project,
-    create_project_embed,
-    get_created_date,
-    parse_created_date,
     update_project
 )
+
+from .project_list import get_created_date
 
 
 # -------------------------------------------------------
@@ -90,22 +95,13 @@ class CreateProjectModal(
         self,
         interaction: discord.Interaction
     ):
-        try:
-            wordcount = int(
-                self.wordcount_input.value
-            )
-
-        except ValueError:
+        wordcount, error = parse_non_negative_integer(
+            self.wordcount_input.value,
+            "Word count"
+        )
+        if error:
             await interaction.response.send_message(
-                "Word count must be a number.",
-                ephemeral=True
-            )
-
-            return
-
-        if wordcount < 0:
-            await interaction.response.send_message(
-                "Word count cannot be negative.",
+                error,
                 ephemeral=True
             )
 
@@ -114,22 +110,13 @@ class CreateProjectModal(
         goal = None
 
         if self.goal_input.value:
-            try:
-                goal = int(
-                    self.goal_input.value
-                )
-
-            except ValueError:
+            goal, error = parse_positive_integer(
+                self.goal_input.value,
+                "Goal"
+            )
+            if error:
                 await interaction.response.send_message(
-                    "Goal must be a number.",
-                    ephemeral=True
-                )
-
-                return
-
-            if goal <= 0:
-                await interaction.response.send_message(
-                    "Goal must be greater than 0.",
+                    error,
                     ephemeral=True
                 )
 
@@ -279,22 +266,13 @@ class EditProjectModal(
         self,
         interaction: discord.Interaction
     ):
-        try:
-            wordcount = int(
-                self.wordcount_input.value
-            )
-
-        except ValueError:
+        wordcount, error = parse_non_negative_integer(
+            self.wordcount_input.value,
+            "Word count"
+        )
+        if error:
             await interaction.response.send_message(
-                "Word count must be a number.",
-                ephemeral=True
-            )
-
-            return
-
-        if wordcount < 0:
-            await interaction.response.send_message(
-                "Word count cannot be negative.",
+                error,
                 ephemeral=True
             )
 
@@ -303,28 +281,19 @@ class EditProjectModal(
         goal = None
 
         if self.goal_input.value:
-            try:
-                goal = int(
-                    self.goal_input.value
-                )
-
-            except ValueError:
+            goal, error = parse_positive_integer(
+                self.goal_input.value,
+                "Goal"
+            )
+            if error:
                 await interaction.response.send_message(
-                    "Goal must be a number.",
+                    error,
                     ephemeral=True
                 )
 
                 return
 
-            if goal <= 0:
-                await interaction.response.send_message(
-                    "Goal must be greater than 0.",
-                    ephemeral=True
-                )
-
-                return
-
-        created_at = parse_created_date(
+        created_at = parse_date_only(
             self.created_input.value
         )
 

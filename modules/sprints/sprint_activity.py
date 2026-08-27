@@ -1,7 +1,25 @@
+from __future__ import annotations
+
 import asyncio
 import time
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .users import SprintUser
+
 import discord
+
+from modules.common.ui import WordCountChangeModal
+
+from .sprint_results import (
+    RESULT_REGISTRATION_SECONDS,
+    RESULT_REMINDER_SECONDS,
+    close_results_registration,
+    get_pending_results,
+    get_sorted_results,
+    send_result_reminder
+)
 
 from modules.user_profile.projects import (
     ProjectPickerView,
@@ -12,10 +30,6 @@ from .system_messages import (
     create_finished_embed,
     create_results_embed
 )
-
-RESULT_REGISTRATION_SECONDS = 600
-RESULT_REMINDER_SECONDS = 120
-
 
 # -------------------------------------------------------
 #                 WORD COUNT CALCULATIONS
@@ -248,13 +262,41 @@ class ActivityChangeView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
-        modal = PreviousActivityModal(
-            sprint_view=self.sprint_view,
-            sprint_user=self.sprint_user
+        modal = WordCountChangeModal(
+            initial_total=self.sprint_user.initial_wc,
+            on_validated=self.register_progress_result,
+            title="Register Current Progress"
         )
 
         await interaction.response.send_modal(
             modal
+        )
+
+    async def register_progress_result(
+        self,
+        interaction,
+        result
+    ):
+        if result.mode == "total":
+            register_previous_total(
+                self.sprint_user,
+                result.new_total
+            )
+        else:
+            register_previous_difference(
+                self.sprint_user,
+                result.difference
+            )
+
+        view = ActivityProjectView(
+            sprint_view=self.sprint_view,
+            sprint_user=self.sprint_user
+        )
+
+        await interaction.response.send_message(
+            "Progress saved. Choose your next project:",
+            view=view,
+            ephemeral=True
         )
 
     @discord.ui.button(
@@ -286,344 +328,9 @@ class ActivityChangeView(
 #               PREVIOUS ACTIVITY MODAL
 # -------------------------------------------------------
 
-class PreviousActivityModal(
-    discord.ui.Modal
-):
-    def __init__(
-        self,
-        sprint_view,
-        sprint_user
-    ):
-        super().__init__(
-            title="Register Current Progress"
-        )
-
-        self.sprint_view = sprint_view
-        self.sprint_user = sprint_user
-
-        self.new_total_input = (
-            discord.ui.TextInput(
-                label="OPTION 1 — New total word count",
-                placeholder="Choose this OR the option below",
-                required=False,
-                max_length=10
-            )
-        )
-
-        self.difference_input = (
-            discord.ui.TextInput(
-                label="OPTION 2 — Words added or removed",
-                placeholder="Choose this OR the option above",
-                required=False,
-                max_length=10
-            )
-        )
-
-        self.add_item(
-            self.new_total_input
-        )
-
-        self.add_item(
-            self.difference_input
-        )
-
-    async def on_submit(
-        self,
-        interaction: discord.Interaction
-    ):
-        new_total_value = (
-            self.new_total_input.value.strip()
-        )
-
-        difference_value = (
-            self.difference_input.value.strip()
-        )
-
-        if (
-            not new_total_value
-            and not difference_value
-        ):
-            await interaction.response.send_message(
-                "Pick one option.",
-                ephemeral=True
-            )
-
-            return
-
-        if (
-            new_total_value
-            and difference_value
-        ):
-            await interaction.response.send_message(
-                "Pick only one option.",
-                ephemeral=True
-            )
-
-            return
-
-        if new_total_value:
-            try:
-                new_total = int(
-                    new_total_value
-                )
-
-            except ValueError:
-                await interaction.response.send_message(
-                    "New total must be a number.",
-                    ephemeral=True
-                )
-
-                return
-
-            if new_total < 0:
-                await interaction.response.send_message(
-                    "New total cannot be negative.",
-                    ephemeral=True
-                )
-
-                return
-
-            register_previous_total(
-                self.sprint_user,
-                new_total
-            )
-
-        else:
-            try:
-                difference = int(
-                    difference_value
-                )
-
-            except ValueError:
-                await interaction.response.send_message(
-                    "Use a number like +234 or -120.",
-                    ephemeral=True
-                )
-
-                return
-
-            final_wc = (
-                calculate_difference_total(
-                    self.sprint_user.initial_wc,
-                    difference
-                )
-            )
-
-            if final_wc < 0:
-                await interaction.response.send_message(
-                    "That would make your project total negative.",
-                    ephemeral=True
-                )
-
-                return
-
-            register_previous_difference(
-                self.sprint_user,
-                difference
-            )
-
-        view = ActivityProjectView(
-            sprint_view=self.sprint_view,
-            sprint_user=self.sprint_user
-        )
-
-        await interaction.response.send_message(
-            "Progress saved. Choose your next project:",
-            view=view,
-            ephemeral=True
-        )
-
-
-# -------------------------------------------------------
-#                    RESULT HELPERS
-# -------------------------------------------------------
-
-def get_registered_results(
-    participants
-):
-    return [
-        sprint_user
-        for sprint_user
-        in participants.get_users()
-        if sprint_user.result_registered
-    ]
-
-
-def get_pending_results(
-    participants
-):
-    return [
-        sprint_user
-        for sprint_user
-        in participants.get_users()
-        if not sprint_user.result_registered
-    ]
-
-
-def get_sorted_results(
-    participants
-):
-    return sorted(
-        get_registered_results(
-            participants
-        ),
-        key=lambda sprint_user: (
-            sprint_user.words_written
-            if sprint_user.words_written
-            is not None
-            else -999999999
-        ),
-        reverse=True
-    )
-
-
 # -------------------------------------------------------
 #                WORD COUNT MODAL
 # -------------------------------------------------------
-
-class WordCountModal(
-    discord.ui.Modal
-):
-    def __init__(
-        self,
-        results_view,
-        sprint_user
-    ):
-        super().__init__(
-            title="Register Word Count"
-        )
-
-        self.results_view = results_view
-        self.sprint_user = sprint_user
-
-        self.new_total_input = (
-            discord.ui.TextInput(
-                label="OPTION 1 — New total word count",
-                placeholder="Choose this OR the option below",
-                required=False,
-                max_length=10
-            )
-        )
-
-        self.difference_input = (
-            discord.ui.TextInput(
-                label="OPTION 2 — Words added or removed",
-                placeholder="Choose this OR the option above",
-                required=False,
-                max_length=10
-            )
-        )
-
-        self.add_item(
-            self.new_total_input
-        )
-
-        self.add_item(
-            self.difference_input
-        )
-
-    async def on_submit(
-        self,
-        interaction
-    ):
-        new_total_value = (
-            self.new_total_input.value.strip()
-        )
-
-        difference_value = (
-            self.difference_input.value.strip()
-        )
-
-        if (
-            not new_total_value
-            and not difference_value
-        ):
-            await interaction.response.send_message(
-                "Pick one option.",
-                ephemeral=True
-            )
-
-            return
-
-        if (
-            new_total_value
-            and difference_value
-        ):
-            await interaction.response.send_message(
-                "Pick only one option.",
-                ephemeral=True
-            )
-
-            return
-
-        if new_total_value:
-            try:
-                new_total = int(
-                    new_total_value
-                )
-
-            except ValueError:
-                await interaction.response.send_message(
-                    "New total must be a number.",
-                    ephemeral=True
-                )
-
-                return
-
-            if new_total < 0:
-                await interaction.response.send_message(
-                    "New total cannot be negative.",
-                    ephemeral=True
-                )
-
-                return
-
-            register_new_total(
-                self.sprint_user,
-                new_total
-            )
-
-        else:
-            try:
-                difference = int(
-                    difference_value
-                )
-
-            except ValueError:
-                await interaction.response.send_message(
-                    "Use a number like +234 or -120.",
-                    ephemeral=True
-                )
-
-                return
-
-            final_wc = (
-                calculate_difference_total(
-                    self.sprint_user.initial_wc,
-                    difference
-                )
-            )
-
-            if final_wc < 0:
-                await interaction.response.send_message(
-                    "That would make your total negative.",
-                    ephemeral=True
-                )
-
-                return
-
-            register_difference(
-                self.sprint_user,
-                difference
-            )
-
-        await interaction.response.send_message(
-            "Word count registered.",
-            ephemeral=True
-        )
-
-        await self.results_view.finish_if_complete()
-
 
 # -------------------------------------------------------
 #                   RESULTS VIEW
@@ -746,83 +453,38 @@ class SprintResultsView(
             return
 
         await interaction.response.send_modal(
-            WordCountModal(
-                self,
-                sprint_user
+            WordCountChangeModal(
+                initial_total=sprint_user.initial_wc,
+                on_validated=self.register_word_count_result
             )
         )
 
-
-# -------------------------------------------------------
-#                  RESULT REMINDER
-# -------------------------------------------------------
-
-async def send_result_reminder(
-    results_view
-):
-    try:
-        await asyncio.sleep(
-            RESULT_REGISTRATION_SECONDS
-            - RESULT_REMINDER_SECONDS
-        )
-
-        if results_view.closed:
-            return
-
-        pending = get_pending_results(
-            results_view.participants
-        )
-
-        if not pending:
-            return
-
-        mentions = " ".join(
-            sprint_user.mention
-            for sprint_user
-            in pending
-        )
-
-        await results_view.message.channel.send(
-            content=(
-                f"{mentions}\n"
-                "2 minutes left to register your word count."
-            ),
-            allowed_mentions=discord.AllowedMentions(
-                everyone=False,
-                users=True,
-                roles=False
+    async def register_word_count_result(
+        self,
+        interaction,
+        result
+    ):
+        if result.mode == "total":
+            register_new_total(
+                self.participants.get_user(
+                    interaction.user.id
+                ),
+                result.new_total
             )
+        else:
+            register_difference(
+                self.participants.get_user(
+                    interaction.user.id
+                ),
+                result.difference
+            )
+
+        await interaction.response.send_message(
+            "Word count registered.",
+            ephemeral=True
         )
 
-    except asyncio.CancelledError:
-        return
-
-
-# -------------------------------------------------------
-#                 CLOSE RESULTS
-# -------------------------------------------------------
-
-async def close_results_registration(
-    results_view
-):
-    try:
-        await asyncio.sleep(
-            RESULT_REGISTRATION_SECONDS
-        )
-
-        if results_view.closed:
-            return
-
-        results_view.closed = True
-
-        await results_view.close_registration_message()
-
-        await results_view.send_final_results()
-
-        results_view.stop()
-
-    except asyncio.CancelledError:
-        return
+        await self.finish_if_complete()
 
 
 # -------------------------------------------------------

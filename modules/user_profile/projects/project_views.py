@@ -981,7 +981,7 @@ class UserProjectsView(
         )
 
     @discord.ui.button(
-        label="➕ Create Project",
+        label="✚ Create Project",
         style=discord.ButtonStyle.primary,
         row=4
     )

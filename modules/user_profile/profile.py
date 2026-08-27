@@ -15,11 +15,6 @@ from .projects import (
     get_project
 )
 
-from modules.config import (
-    ConfigView,
-    create_config_embed
-)
-
 # -------------------------------------------------------
 #                 LAST SPRINT PROJECT
 # -------------------------------------------------------
@@ -190,6 +185,11 @@ class ProfileView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
+        from modules.config.user.user_views import (
+            ConfigView,
+            create_config_embed
+        )
+
         await interaction.response.edit_message(
             embed=create_config_embed(
                 self.owner

@@ -4,6 +4,20 @@ import uuid
 
 import discord
 
+from modules.config import (
+    can_create_sprint,
+    can_manage_sprint_action,
+    get_channel_config,
+    resolve_empty_sprint_timeout,
+    resolve_sprint_setting
+)
+
+from modules.config.sprint.sprint_config import create_sprint_config
+from modules.config.sprint.sprint_views import (
+    SprintSettingsView,
+    create_sprint_settings_embed
+)
+
 from modules.user_profile.projects import (
     create_project_picker_embed
 )
@@ -108,7 +122,12 @@ class SprintView(
     def __init__(
         self,
         duration: int,
-        starts_in: int
+        starts_in: int,
+        creator_id: int,
+        guild_id: int,
+        channel_id: int,
+        channel_config=None,
+        sprint_config=None
     ):
         super().__init__(
             timeout=None
@@ -120,6 +139,16 @@ class SprintView(
 
         self.duration = duration
         self.starts_in = starts_in
+        self.creator_id = creator_id
+        self.guild_id = guild_id
+        self.channel_id = channel_id
+        self.channel_config = channel_config or get_channel_config(
+            guild_id,
+            channel_id
+        )
+        self.sprint_config = create_sprint_config(
+            sprint_config
+        )
 
         self.message = None
         self.sprint_timer = None
@@ -348,33 +377,41 @@ class SprintView(
             if len(
                 self.participants
             ) == 0:
-                empty_timeout = min(
-                    duration_seconds,
-                    600
-                )
+                if self.channel_config["cancel_empty_sprints"]:
+                    empty_timeout = min(
+                        duration_seconds,
+                        resolve_empty_sprint_timeout(
+                            self.channel_config,
+                            self.sprint_config
+                        )
+                    )
 
-                await asyncio.sleep(
-                    empty_timeout
-                )
-
-                if self.finished:
-                    return
-
-                if len(
-                    self.participants
-                ) == 0:
-                    await self.close_empty_sprint()
-
-                    return
-
-                remaining_seconds = (
-                    duration_seconds
-                    - empty_timeout
-                )
-
-                if remaining_seconds > 0:
                     await asyncio.sleep(
-                        remaining_seconds
+                        empty_timeout
+                    )
+
+                    if self.finished:
+                        return
+
+                    if len(
+                        self.participants
+                    ) == 0:
+                        await self.close_empty_sprint()
+
+                        return
+
+                    remaining_seconds = (
+                        duration_seconds
+                        - empty_timeout
+                    )
+
+                    if remaining_seconds > 0:
+                        await asyncio.sleep(
+                            remaining_seconds
+                        )
+                else:
+                    await asyncio.sleep(
+                        duration_seconds
                     )
 
             else:
@@ -533,6 +570,17 @@ class SprintView(
         self,
         interaction: discord.Interaction
     ):
+        if not can_manage_sprint_action(
+            interaction.user,
+            self.creator_id,
+            self.channel_config["cancel_sprints"]
+        ):
+            await interaction.response.send_message(
+                "You do not have permission to cancel this sprint.",
+                ephemeral=True
+            )
+            return
+
         if self.sprint_timer is not None:
             self.sprint_timer.cancel()
 
@@ -593,6 +641,17 @@ class SprintView(
 
             return
 
+        if self.started and not resolve_sprint_setting(
+            "allow_join_after_start",
+            self.channel_config,
+            self.sprint_config
+        ):
+            await interaction.response.send_message(
+                "Joining after the sprint starts is disabled.",
+                ephemeral=True
+            )
+            return
+
         join_view = JoinSprintView(
             sprint_view=self,
             user_id=interaction.user.id
@@ -625,6 +684,17 @@ class SprintView(
                 ephemeral=True
             )
 
+            return
+
+        if self.started and not resolve_sprint_setting(
+            "allow_leave_after_start",
+            self.channel_config,
+            self.sprint_config
+        ):
+            await interaction.response.send_message(
+                "Leaving after the sprint starts is disabled.",
+                ephemeral=True
+            )
             return
 
         removed = self.participants.remove_user(
@@ -661,6 +731,17 @@ class SprintView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
+        if not can_manage_sprint_action(
+            interaction.user,
+            self.creator_id,
+            self.channel_config["cancel_sprints"]
+        ):
+            await interaction.response.send_message(
+                "You do not have permission to cancel this sprint.",
+                ephemeral=True
+            )
+            return
+
         confirmation_view = ConfirmationView(
             confirm_callback=self.confirm_cancel
         )
@@ -694,12 +775,59 @@ class SprintView(
 
             return
 
+        if not can_manage_sprint_action(
+            interaction.user,
+            self.creator_id,
+            self.channel_config["change_sprint_time"]
+        ):
+            await interaction.response.send_message(
+                "You do not have permission to change this sprint's time.",
+                ephemeral=True
+            )
+            return
+
         modal = SprintTimeModal(
             self
         )
 
         await interaction.response.send_modal(
             modal
+        )
+
+
+# -------------------------------------------------------
+#                 SPRINT SETTINGS
+# -------------------------------------------------------
+
+    @discord.ui.button(
+        label="Sprint Settings",
+        style=discord.ButtonStyle.secondary,
+        row=1
+    )
+    async def sprint_settings(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        if not can_manage_sprint_action(
+            interaction.user,
+            self.creator_id,
+            "creator_or_moderator"
+        ):
+            await interaction.response.send_message(
+                "Only the sprint creator or moderators can edit these settings.",
+                ephemeral=True
+            )
+            return
+
+        await interaction.response.send_message(
+            embed=create_sprint_settings_embed(
+                self
+            ),
+            view=SprintSettingsView(
+                self
+            ),
+            ephemeral=True
         )
 
         
@@ -967,12 +1095,41 @@ class SprintTimeModal(
 
             return
 
-        if duration <= 0:
+        if duration < self.sprint_view.channel_config["min_duration"] or duration > self.sprint_view.channel_config["max_duration"]:
             await interaction.response.send_message(
-                duration_invalid_message,
+                "Duration must be within the channel's allowed limits.",
                 ephemeral=True
             )
 
+            return
+
+        if self.sprint_view.started and not resolve_sprint_setting(
+            "allow_change_duration_after_start",
+            self.sprint_view.channel_config,
+            self.sprint_view.sprint_config
+        ):
+            await interaction.response.send_message(
+                "Changing duration after the sprint starts is disabled.",
+                ephemeral=True
+            )
+            return
+
+        if not self.sprint_view.started and starts_in > self.sprint_view.channel_config["max_waiting_time"]:
+            await interaction.response.send_message(
+                "Waiting time exceeds the channel limit.",
+                ephemeral=True
+            )
+            return
+
+        if not self.sprint_view.started and not resolve_sprint_setting(
+            "allow_change_waiting_time",
+            self.sprint_view.channel_config,
+            self.sprint_view.sprint_config
+        ) and starts_in != self.sprint_view.starts_in:
+            await interaction.response.send_message(
+                "Changing waiting time is disabled.",
+                ephemeral=True
+            )
             return
 
         if (
@@ -1045,6 +1202,21 @@ class SprintCreateModal(
         self,
         interaction: discord.Interaction
     ):
+        channel_config = get_channel_config(
+            interaction.guild_id,
+            interaction.channel_id
+        )
+
+        if not can_create_sprint(
+            interaction.user,
+            channel_config["create_sprints"]
+        ):
+            await interaction.response.send_message(
+                "You do not have permission to create sprints in this channel.",
+                ephemeral=True
+            )
+            return
+
         try:
             duration = int(
                 self.duration_input.value
@@ -1055,7 +1227,7 @@ class SprintCreateModal(
                     self.starts_in_input.value
                 )
                 if self.starts_in_input.value
-                else 0
+                else channel_config["default_waiting_time"]
             )
 
         except ValueError:
@@ -1067,8 +1239,10 @@ class SprintCreateModal(
             return
 
         if (
-            duration <= 0
+            duration < channel_config["min_duration"]
+            or duration > channel_config["max_duration"]
             or starts_in < 0
+            or starts_in > channel_config["max_waiting_time"]
         ):
             await interaction.response.send_message(
                 create_time_invalid_message,
@@ -1089,7 +1263,11 @@ class SprintCreateModal(
 
         view = SprintView(
             duration=duration,
-            starts_in=starts_in
+            starts_in=starts_in,
+            creator_id=interaction.user.id,
+            guild_id=interaction.guild_id,
+            channel_id=interaction.channel_id,
+            channel_config=channel_config
         )
 
         await interaction.response.send_message(

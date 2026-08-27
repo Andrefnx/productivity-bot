@@ -1,0 +1,84 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^python -c \"from modules\\.config import ConfigView, can_view_profile, can_view_projects; from modules\\.config\\.user\\.user_config import get_user_config; from modules\\.config\\.user\\.user_views import create_config_embed; import modules\\.config\\.channel\\.channel_config, modules\\.config\\.channel\\.channel_views, modules\\.config\\.sprint\\.sprint_config, modules\\.config\\.sprint\\.sprint_views; print\\('config imports ok'\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -c \"from modules\\.config import DEFAULT_CONFIG, ConfigView, create_config_embed, can_view_profile, can_view_projects; from modules\\.config\\.user import get_user_config, update_user_config; print\\('config public API ok'\\)\"; python -m compileall -q main\\.py modules$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -m compileall -q modules/config$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -c \"from modules\\.config import DEFAULT_CONFIG, DEFAULT_CHANNEL_CONFIG, DEFAULT_SPRINT_CONFIG, ChannelConfigView, ConfigView, SprintConfigView, resolve_sprint_setting; print\\('public imports ok'\\); print\\(resolve_sprint_setting\\('allow_join_after_start', \\{'allow_join_after_start': False\\}, \\{'allow_join_after_start': True\\}\\)\\); view = ChannelConfigView\\(1, 2\\); print\\(len\\(view\\.config\\), view\\.config\\['default_duration'\\]\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -c \"from modules\\.config import resolve_setting; assert resolve_setting\\('allow_join_after_start', \\{'allow_join_after_start': True\\}, \\{'allow_join_after_start': False\\}, \\{'allow_join_after_start': True\\}\\) is False; assert resolve_setting\\('allow_join_after_start', \\{'allow_join_after_start': True\\}, \\{'allow_join_after_start': True\\}, \\{'allow_join_after_start': False\\}\\) is False; print\\('resolver priority ok'\\)\"; python -m compileall -q modules/config$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -m compileall -q main\\.py modules/user_profile/profile\\.py modules/user_profile/__init__\\.py; python -c \"import main; from modules\\.user_profile\\.profile import ProfileView; print\\('integration imports ok'\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -m py_compile main\\.py modules/user_profile/profile\\.py modules/user_profile/__init__\\.py$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -m py_compile modules/config/permissions\\.py modules/config/sprint/sprint_config\\.py modules/config/sprint/sprint_views\\.py modules/config/__init__\\.py$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -m py_compile modules/sprints/active_sprint\\.py$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -m py_compile modules/config/permissions\\.py modules/config/__init__\\.py modules/config/sprint/sprint_config\\.py modules/config/sprint/sprint_views\\.py modules/sprints/active_sprint\\.py modules/sprints/users\\.py$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -c \"import modules\\.sprints\\.active_sprint, modules\\.sprints\\.users; from modules\\.config import resolve_sprint_setting, resolve_empty_sprint_timeout; assert resolve_sprint_setting\\('allow_join_after_start', \\{'allow_join_after_start': False\\}, \\{'allow_join_after_start': True\\}\\) is False; assert resolve_sprint_setting\\('allow_join_after_start', \\{'allow_join_after_start': True\\}, \\{'allow_join_after_start': False\\}\\) is False; assert resolve_empty_sprint_timeout\\(\\{'empty_sprint_timeout': 10\\}, \\{'empty_sprint_timeout': 120\\}\\) == 120; print\\('sprint config imports and resolution ok'\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -c \"from modules\\.config\\.permissions import can_create_sprint, can_manage_sprint_action; class P: pass; p=P\\(\\); p\\.administrator=False; p\\.manage_messages=True; p\\.manage_guild=False; class M: pass; m=M\\(\\); m\\.id=1; m\\.guild_permissions=p; assert can_create_sprint\\(m, 'manage_messages'\\); assert can_manage_sprint_action\\(m, 1, 'creator'\\); print\\('permission rules ok'\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -m compileall -q modules/config modules/sprints$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -c \"from types import SimpleNamespace as N; from modules\\.config\\.permissions import can_create_sprint, can_manage_sprint_action; permissions=N\\(administrator=False, manage_messages=True, manage_guild=False\\); member=N\\(id=1, guild_permissions=permissions\\); assert can_create_sprint\\(member, 'manage_messages'\\); assert can_manage_sprint_action\\(member, 1, 'creator'\\); print\\('permission rules ok'\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -m py_compile modules/config/permissions\\.py modules/config/sprint/sprint_config\\.py modules/config/sprint/sprint_views\\.py modules/sprints/active_sprint\\.py modules/sprints/users\\.py$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -c \"from modules\\.config import resolve_sprint_setting, resolve_empty_sprint_timeout; assert resolve_sprint_setting\\('allow_join_after_start', \\{'allow_join_after_start': False\\}, \\{'allow_join_after_start': True\\}\\) is False; assert resolve_sprint_setting\\('allow_leave_after_start', \\{'allow_leave_after_start': True\\}, \\{'allow_leave_after_start': False\\}\\) is False; assert resolve_empty_sprint_timeout\\(\\{'empty_sprint_timeout': 10\\}, \\{'empty_sprint_timeout': 120\\}\\) == 120; print\\('restriction and timeout rules ok'\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -m py_compile modules/common/validation\\.py modules/common/ui/modals\\.py modules/common/__init__\\.py modules/common/ui/__init__\\.py$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -c \"from modules\\.common\\.validation import validate_word_count_change; result, error = validate_word_count_change\\('', '\\+250', 1000\\); assert error is None and result\\.new_total == 1250 and result\\.difference == 250; result, error = validate_word_count_change\\('2350', '', 1000\\); assert error is None and result\\.mode == 'total'; print\\('word count validator ok'\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -m py_compile modules/common/validation\\.py modules/common/ui/modals\\.py modules/sprints/sprint_activity\\.py$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python -m py_compile modules/common/validation\\.py modules/user_profile/projects/project_modals\\.py$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

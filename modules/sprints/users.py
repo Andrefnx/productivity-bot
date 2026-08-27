@@ -2,6 +2,8 @@ import uuid
 
 import discord
 
+from modules.config import resolve_sprint_setting
+
 from modules.user_profile.profile import (
     set_last_project
 )
@@ -306,6 +308,17 @@ class JoinSprintView(
         interaction,
         project
     ):
+        if self.sprint_view.started and not resolve_sprint_setting(
+            "allow_join_after_start",
+            self.sprint_view.channel_config,
+            self.sprint_view.sprint_config
+        ):
+            await interaction.response.send_message(
+                "Joining after the sprint starts is disabled.",
+                ephemeral=True
+            )
+            return
+
         if self.sprint_view.participants.has_user(
             interaction.user.id
         ):
