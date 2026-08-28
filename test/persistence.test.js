@@ -15,9 +15,13 @@ test('JSON persistence reads defaults and writes atomically', async () => {
 });
 
 test('profile and configuration defaults retain Python-compatible keys', async () => {
-  const profile = await getProfile(`node-test-${process.pid}`);
+  const userId = `node-test-${process.pid}`;
+  const profile = await getProfile(userId);
   assert.deepEqual(Object.keys(profile.economy).sort(), ['coins', 'lifetime_coins', 'lifetime_xp', 'migrations', 'sprint_rewards', 'sprints_rewarded', 'transactions']);
   assert.equal(profile.level, 1);
   assert.equal(defaultChannelConfig.default_duration, 30);
   assert.equal(defaultUserConfig.timezone, 'America/Punta_Arenas');
+  const profiles = await readJson('profiles.json', {});
+  delete profiles[userId];
+  await writeJson('profiles.json', profiles);
 });
