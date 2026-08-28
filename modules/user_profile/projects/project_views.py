@@ -588,7 +588,7 @@ class ProjectPickerView(
     @discord.ui.button(
         label="↩️ Use Last Project",
         style=discord.ButtonStyle.secondary,
-        row=2
+        row=3
     )
     async def last_project_button(
         self,

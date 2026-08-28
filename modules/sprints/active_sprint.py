@@ -657,16 +657,26 @@ class SprintView(
             )
             return
 
-        join_view = JoinSprintView(
-            sprint_view=self,
-            user_id=interaction.user.id
-        )
+        try:
+            join_view = JoinSprintView(
+                sprint_view=self,
+                user_id=interaction.user.id
+            )
 
-        await interaction.response.send_message(
-            embed=create_project_picker_embed(),
-            view=join_view,
-            ephemeral=True
-        )
+            await interaction.response.send_message(
+                embed=create_project_picker_embed(),
+                view=join_view,
+                ephemeral=True
+            )
+        except Exception as error:
+            print("ERROR OPENING SPRINT JOIN:")
+            print(repr(error))
+
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "Unable to open the sprint join menu. Please try again.",
+                    ephemeral=True
+                )
 
 
 # -------------------------------------------------------
