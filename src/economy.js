@@ -19,7 +19,7 @@ const defaultProfile = {
 };
 
 function calculateLevel(xp) {
-  return Math.floor(Number(xp) / 100) + 1;
+  return Math.floor(Math.max(0, Number(xp)) / 100) + 1;
 }
 
 async function getProfile(userId) {
@@ -53,16 +53,18 @@ function calculateSprintRewards(duration, wordsWritten) {
     return { xp: 10, coins: 0 };
   }
 
-  const durationXp = duration < 15 ? 0 : duration < 30 ? 2 : duration < 60 ? 5 : duration < 120 ? 10 : 15;
+  const safeDuration = Math.max(0, Number(duration));
+  const positiveWords = Math.max(0, Number(wordsWritten));
+  const durationXp = safeDuration < 15 ? 0 : safeDuration < 30 ? 2 : safeDuration < 60 ? 5 : safeDuration < 120 ? 10 : 15;
   return {
-    xp: 15 + durationXp + Math.floor(wordsWritten / 50),
-    coins: Math.max(1, Math.floor(wordsWritten / 100))
+    xp: 15 + durationXp + Math.floor(positiveWords / 50),
+    coins: Math.max(1, Math.floor(positiveWords / 100))
   };
 }
 
 async function awardSprintResult(sprintUser, duration, sprintId) {
   const profile = await getProfile(sprintUser.user_id);
-  const rewardKey = String(sprintId);
+  const rewardKey = `${sprintId}:${sprintUser.user_id}`;
   const economy = structuredClone(profile.economy);
 
   if (economy.sprint_rewards[rewardKey]) {
