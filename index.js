@@ -2,9 +2,10 @@ require('dotenv').config();
 
 const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, Events, GatewayIntentBits,
-  ModalBuilder, REST, SlashCommandBuilder, StringSelectMenuBuilder, TextInputBuilder, TextInputStyle
+  ModalBuilder, PermissionFlagsBits, REST, SlashCommandBuilder, StringSelectMenuBuilder, TextInputBuilder, TextInputStyle
 } = require('discord.js');
 const { readJson, writeJson } = require('./src/persistence');
+const { downloadAvatar, isBotOwner, validateAvatarUrl, validateNickname } = require('./src/appearance');
 const { awardSprintResult, getProfile } = require('./src/economy');
 const { canCreateSprint, canManageSprintAction, defaultChannelConfig, defaultUserConfig, getChannelConfig, getUserConfig, updateChannelConfig, updateUserConfig } = require('./src/config');
 const { createProject, getProjects, updateProject } = require('./src/projects');
@@ -80,6 +81,20 @@ function profileEmbed(user, profile) { const xp = Number(profile.xp ?? 0); retur
 function profileComponents(userId) { return [new ActionRowBuilder().addComponents(button(`profile:projects:${userId}`, 'My Projects', ButtonStyle.Primary), button(`profile:settings:${userId}`, 'Settings'), button(`profile:import:${userId}`, 'Import JSON'))]; }
 function configEmbed(config, title = 'Settings') { return new EmbedBuilder().setTitle(title).setDescription('Choose a setting to change.').addFields(...Object.entries(config).map(([key, value]) => field(key.replaceAll('_', ' '), String(value), true))); }
 function configSelect(id, config) { return new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(id).setPlaceholder('Select a setting').addOptions(Object.entries(config).map(([key, value]) => ({ label: key.replaceAll('_', ' ').slice(0, 100), value: key, description: String(value).slice(0, 100) })))); }
+function appearanceEmbed() { return new EmbedBuilder().setTitle('Bot Appearance').setDescription('Change this bot\'s nickname for this server. The global avatar changes in every server.'); }
+function appearanceComponents(userId) {
+  const rows = [new ActionRowBuilder().addComponents(button(`appearance:nickname:${userId}`, 'Change Bot Name', ButtonStyle.Primary), button(`appearance:reset:${userId}`, 'Reset Bot Name', ButtonStyle.Secondary))];
+  if (process.env.BOT_OWNER_ID && isBotOwner(userId)) rows.push(new ActionRowBuilder().addComponents(button(`appearance:avatar:${userId}`, 'Global Bot Avatar', ButtonStyle.Danger)));
+  return rows;
+}
+async function getBotMember(interaction) {
+  if (!interaction.guild) return null;
+  return interaction.guild.members.me ?? interaction.guild.members.fetch(client.user.id);
+}
+async function canChangeBotNickname(interaction) {
+  const botMember = await getBotMember(interaction);
+  return botMember?.permissions.has(PermissionFlagsBits.ChangeNickname) ? botMember : null;
+}
 
 async function showProjects(interaction, userId) {
   const projects = await getProjects(userId); const entries = Object.entries(projects);
@@ -101,6 +116,7 @@ async function showProjects(interaction, userId) {
 
 client.once(Events.ClientReady, async readyClient => {
   console.log(`Logged in as: ${readyClient.user.tag}`);
+  if (!process.env.BOT_OWNER_ID) console.warn('BOT_OWNER_ID is not configured; global bot avatar changes are disabled.');
   try { await new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN).put(`/applications/${readyClient.user.id}/commands`, { body: commands }); console.log(`Synced commands: ${commands.length}`); } catch (error) { console.error('Command registration failed:', error); }
   await recoverSprints(); console.log('Bot ready for use');
 });
@@ -110,17 +126,53 @@ client.on(Events.InteractionCreate, async interaction => {
     if (interaction.isChatInputCommand()) {
       if (interaction.commandName === 'sprint') { const config = await getChannelConfig(interaction.guildId, interaction.channelId); if (!canCreateSprint(interaction.member, config.create_sprints)) return interaction.reply({ content: 'You do not have permission to create sprints in this channel.', ephemeral: true }); const modal = new ModalBuilder().setCustomId('sprint:create').setTitle('Create a Sprint').addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('duration').setLabel('Duration in minutes').setStyle(TextInputStyle.Short).setValue(String(config.default_duration)).setRequired(true)), new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('waiting').setLabel('Start waiting time in minutes').setStyle(TextInputStyle.Short).setValue(String(config.start_waiting_time)).setRequired(true))); return interaction.showModal(modal); }
       if (interaction.commandName === 'profile') { const profile = await getProfile(interaction.user.id); return interaction.reply({ embeds: [profileEmbed(interaction.user, profile)], components: profileComponents(interaction.user.id), ephemeral: true }); }
-      if (interaction.commandName === 'config') { const config = await getUserConfig(interaction.user.id); return interaction.reply({ embeds: [configEmbed(config)], components: [configSelect(`config:user:${interaction.user.id}`, config), new ActionRowBuilder().addComponents(button(`config:channel:${interaction.user.id}`, 'Channel Settings'))], ephemeral: true }); }
+      if (interaction.commandName === 'config') { const config = await getUserConfig(interaction.user.id); return interaction.reply({ embeds: [configEmbed(config)], components: [configSelect(`config:user:${interaction.user.id}`, config), new ActionRowBuilder().addComponents(button(`config:channel:${interaction.user.id}`, 'Channel Settings'), button(`appearance:open:${interaction.user.id}`, 'Bot Appearance'))], ephemeral: true }); }
       if (interaction.commandName === 'help') { const sections = { 'Getting Started': '**Main commands**\n\n`/sprint` - Start a new productivity sprint.\n`/profile` - Open your personal profile menu.\n`/config` - Change your privacy and display settings.\n`/help` - Open this guide.', Sprints: 'Use `/sprint` and choose how long the sprint should last and when it should begin. Press **Join** and choose a project. At the end, register your final word count.', Projects: 'Use `/profile` and press **My Projects** to create, edit and select projects.', Profile: 'Your profile shows your XP, level, coins and last project.', Settings: 'Use `/config` to change privacy, date and time settings.', Imports: 'Open `/profile`, press **Import JSON**, then upload a Writer Bot export.' }; return interaction.reply({ embeds: [new EmbedBuilder().setTitle('Help').setDescription('Welcome! This guide explains how to use the bot.')], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`help:${interaction.user.id}`).setPlaceholder('Choose a section').addOptions(Object.keys(sections).map(key => ({ label: key, value: key }))))], ephemeral: true }); }
     }
     if (interaction.isModalSubmit()) {
       if (interaction.customId === 'sprint:create') { const duration = Number(interaction.fields.getTextInputValue('duration')); const waiting = Number(interaction.fields.getTextInputValue('waiting')); if (!Number.isInteger(duration) || !Number.isInteger(waiting) || duration <= 0 || waiting < 0) return interaction.reply({ content: 'Duration must be greater than 0, and start time cannot be negative.', ephemeral: true }); const id = `${interaction.guildId}-${interaction.channelId}-${Date.now()}`; const sprint = { id, guildId: interaction.guildId, channelId: interaction.channelId, creatorId: interaction.user.id, duration, startTimestamp: Math.floor(Date.now() / 1000) + waiting * 60, participants: [], started: false, finished: false }; await interaction.reply({ embeds: [waitingEmbed(sprint)], components: sprintComponents(sprint) }); const reply = await interaction.fetchReply(); sprint.messageId = reply.id; activeSprints.set(id, sprint); schedule(sprint); return saveActiveSprints(); }
       if (interaction.customId.startsWith('sprint:time:')) { const sprintId = interaction.customId.split(':')[2]; const sprint = activeSprints.get(sprintId); if (!sprint || sprint.started) return interaction.reply({ content: 'This sprint has already started or is no longer active.', ephemeral: true }); const duration = Number(interaction.fields.getTextInputValue('duration')); const waiting = Number(interaction.fields.getTextInputValue('waiting')); if (!Number.isInteger(duration) || !Number.isInteger(waiting) || duration <= 0 || waiting < 0) return interaction.reply({ content: 'Duration must be greater than 0, and start time cannot be negative.', ephemeral: true }); clearTimeout(sprint.timers.start); sprint.duration = duration; sprint.startTimestamp = Math.floor(Date.now() / 1000) + waiting * 60; schedule(sprint); await updateSprintMessage(sprint, waitingEmbed(sprint, true)); await saveActiveSprints(); return interaction.reply({ content: 'Sprint time updated!', ephemeral: true }); }
+      if (interaction.customId.startsWith('appearance:nickname-modal:')) {
+        const userId = interaction.customId.split(':')[2];
+        if (!ownerOnly(interaction, userId) || !interaction.guild || !interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) return interaction.reply({ content: 'Only administrators or server managers can change bot appearance.', ephemeral: true });
+        const nickname = validateNickname(interaction.fields.getTextInputValue('nickname'));
+        if (!nickname.valid) return interaction.reply({ content: nickname.error, ephemeral: true });
+        await interaction.deferReply({ ephemeral: true });
+        const botMember = await canChangeBotNickname(interaction);
+        if (!botMember) return interaction.editReply("I don't have permission to change my nickname in this server.");
+        try { await botMember.setNickname(nickname.nickname); return interaction.editReply('Bot name updated for this server.'); } catch (error) { console.error('Bot nickname change failed:', error); return interaction.editReply("Discord couldn't change my nickname in this server. Check my Change Nickname permission and role hierarchy."); }
+      }
+      if (interaction.customId.startsWith('appearance:nickname:')) { const userId = interaction.customId.split(':')[2]; if (!ownerOnly(interaction, userId)) return interaction.reply({ content: 'This settings menu belongs to another user.', ephemeral: true }); return interaction.showModal(new ModalBuilder().setCustomId(`appearance:nickname-modal:${userId}`).setTitle('Change Bot Name').addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('nickname').setLabel('New bot name for this server').setStyle(TextInputStyle.Short).setMaxLength(32).setRequired(true)))); }
+      if (interaction.customId.startsWith('appearance:avatar-modal:')) { const userId = interaction.customId.split(':')[2]; if (!isBotOwner(interaction.user.id) || !ownerOnly(interaction, userId)) return interaction.reply({ content: 'Only the bot owner can change the global avatar.', ephemeral: true }); const source = validateAvatarUrl(interaction.fields.getTextInputValue('avatar_url')); if (!source.valid) return interaction.reply({ content: source.error, ephemeral: true }); await interaction.deferReply({ ephemeral: true }); try { const image = await downloadAvatar(source.url); await client.user.setAvatar(image); return interaction.editReply('Global bot avatar updated. It may take a moment to appear in every server.'); } catch (error) { console.error('Global bot avatar change failed:', error); return interaction.editReply(error.status === 429 ? 'Discord rate-limited the avatar change. Please wait before trying again.' : error.message || 'Discord could not update the global bot avatar.'); } }
       if (interaction.customId.startsWith('project:create:')) { const userId = interaction.customId.split(':')[2]; const project = await createProject(userId, { name: interaction.fields.getTextInputValue('name'), description: interaction.fields.getTextInputValue('description'), wordcount: interaction.fields.getTextInputValue('wordcount'), goal: interaction.fields.getTextInputValue('goal'), status: 'Active' }); return interaction.reply({ content: `Project **${project.name}** created.`, ephemeral: true }); }
       if (interaction.customId.startsWith('result:')) { const [, sprintId] = interaction.customId.split(':'); const sprint = activeSprints.get(sprintId); if (!sprint) return interaction.reply({ content: 'This sprint is no longer active.', ephemeral: true }); const participant = sprint.participants.find(item => item.user_id === interaction.user.id); const total = interaction.fields.getTextInputValue('total').trim(); const difference = interaction.fields.getTextInputValue('difference').trim(); if (!!total === !!difference) return interaction.reply({ content: total ? "Pick only one option. Don't enter both your new total and your word count change." : 'Pick one option:\n• New total word count\n• Words added or removed', ephemeral: true }); if (total && (!/^\d+$/.test(total) || Number(total) < 0)) return interaction.reply({ content: 'New total must be a non-negative number.', ephemeral: true }); if (difference && !/^[+-]\d+$/.test(difference)) return interaction.reply({ content: 'Word count change must be a number like +234 or -120.', ephemeral: true }); participant.final_wc = total ? Number(total) : participant.initial_wc + Number(difference); if (participant.final_wc < 0) return interaction.reply({ content: 'That change would make your total word count negative.', ephemeral: true }); participant.words_written = participant.final_wc - participant.initial_wc; await saveActiveSprints(); return interaction.reply({ content: 'Word count registered.', ephemeral: true }); }
     }
     if (interaction.isButton()) {
       const [area, action, id] = interaction.customId.split(':');
+      if (area === 'appearance') {
+        if (!ownerOnly(interaction, id)) return interaction.reply({ content: 'This settings menu belongs to another user.', ephemeral: true });
+        if (!interaction.guild) return interaction.reply({ content: 'Bot appearance can only be changed in a server.', ephemeral: true });
+        if (action === 'open') {
+          if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) return interaction.reply({ content: 'Only administrators or server managers can change bot appearance.', ephemeral: true });
+          return interaction.update({ embeds: [appearanceEmbed()], components: appearanceComponents(id) });
+        }
+        if (action === 'nickname') {
+          if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) return interaction.reply({ content: 'Only administrators or server managers can change bot appearance.', ephemeral: true });
+          return interaction.showModal(new ModalBuilder().setCustomId(`appearance:nickname-modal:${id}`).setTitle('Change Bot Name').addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('nickname').setLabel('New bot name for this server').setStyle(TextInputStyle.Short).setMaxLength(32).setRequired(true))));
+        }
+        if (action === 'reset') {
+          if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) return interaction.reply({ content: 'Only administrators or server managers can change bot appearance.', ephemeral: true });
+          await interaction.deferReply({ ephemeral: true }); const botMember = await canChangeBotNickname(interaction); if (!botMember) return interaction.editReply("I don't have permission to change my nickname in this server."); try { await botMember.setNickname(null); return interaction.editReply('Bot name reset for this server.'); } catch (error) { console.error('Bot nickname reset failed:', error); return interaction.editReply("Discord couldn't reset my nickname in this server. Check my Change Nickname permission and role hierarchy."); }
+        }
+        if (action === 'avatar') {
+          if (!isBotOwner(interaction.user.id)) return interaction.reply({ content: 'Only the bot owner can change the global avatar.', ephemeral: true });
+          return interaction.update({ embeds: [new EmbedBuilder().setTitle('Global Bot Avatar').setDescription('This will change the bot avatar in every server.')], components: [new ActionRowBuilder().addComponents(button(`appearance:avatar-confirm:${id}`, 'Confirm Global Avatar Change', ButtonStyle.Danger), button(`appearance:open:${id}`, 'Cancel'))] });
+        }
+        if (action === 'avatar-confirm') {
+          if (!isBotOwner(interaction.user.id)) return interaction.reply({ content: 'Only the bot owner can change the global avatar.', ephemeral: true });
+          return interaction.showModal(new ModalBuilder().setCustomId(`appearance:avatar-modal:${id}`).setTitle('Global Bot Avatar').addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('avatar_url').setLabel('Discord CDN image URL').setStyle(TextInputStyle.Short).setPlaceholder('https://cdn.discordapp.com/attachments/...').setRequired(true))));
+        }
+      }
       if (area === 'profile') { if (!ownerOnly(interaction, id)) return interaction.reply({ content: 'This menu belongs to another user.', ephemeral: true }); if (action === 'projects') return showProjects(interaction, id); if (action === 'settings') return interaction.update({ embeds: [configEmbed(await getUserConfig(id))], components: [configSelect(`config:user:${id}`, await getUserConfig(id))] }); if (action === 'import') return interaction.reply({ content: 'Import JSON is available for Writer Bot exports. Attachment imports are not yet supported by this Node runtime.', ephemeral: true }); if (action === 'back') return interaction.update({ embeds: [profileEmbed(interaction.user, await getProfile(id))], components: profileComponents(id) }); }
       if (area === 'project' && action === 'create') { if (!ownerOnly(interaction, id)) return interaction.reply({ content: 'This menu belongs to another user.', ephemeral: true }); const modal = new ModalBuilder().setCustomId(`project:create:${id}`).setTitle('Create Project').addComponents(...[['name', 'Project name', true], ['description', 'Description', false], ['wordcount', 'Current word count', true], ['goal', 'Word count goal', false]].map(([key, label, required]) => new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId(key).setLabel(label).setStyle(TextInputStyle.Short).setRequired(required)))); return interaction.showModal(modal); }
       if (area === 'config' && action === 'channel') { if (!ownerOnly(interaction, id) || !interaction.member.permissions.has('ManageGuild')) return interaction.reply({ content: 'Only administrators or server managers can edit channel settings.', ephemeral: true }); const config = await getChannelConfig(interaction.guildId, interaction.channelId); return interaction.update({ embeds: [configEmbed(config, 'Channel Settings')], components: [configSelect(`config:channel:${id}`, config)] }); }
