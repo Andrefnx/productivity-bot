@@ -32,14 +32,9 @@ from .messages import (
     duration_invalid_message,
     ending_soon_message,
     ending_soon_submessage,
-    force_ended_message,
-    force_ending_message,
-    force_started_message,
     join_question_message,
     left_message,
-    no_test_participants_message,
     not_joined_message,
-    start_first_message,
     start_message,
     start_time_invalid_message,
     time_invalid_message,
@@ -902,144 +897,6 @@ class SprintView(
             view=activity_view,
             ephemeral=True
         )
-        
-# -------------------------------------------------------
-#                 TEST FORCE START
-# -------------------------------------------------------
-
-    @discord.ui.button(
-        label="Force Start",
-        style=discord.ButtonStyle.success,
-        row=2
-    )
-    async def force_start(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-        if self.finished:
-            await interaction.response.send_message(
-                already_finished_message,
-                ephemeral=True
-            )
-
-            return
-
-        if self.started:
-            await interaction.response.send_message(
-                already_started_message,
-                ephemeral=True
-            )
-
-            return
-
-        await interaction.response.defer(
-            ephemeral=True
-        )
-
-        if self.sprint_timer is not None:
-            self.sprint_timer.cancel()
-
-        await self.start_sprint()
-
-        self.sprint_timer = asyncio.create_task(
-            self.run_active_timer()
-        )
-
-        await interaction.followup.send(
-            force_started_message,
-            ephemeral=True
-        )
-
-# -------------------------------------------------------
-#                  TEST FORCE END
-# -------------------------------------------------------
-
-    @discord.ui.button(
-        label="Force End",
-        style=discord.ButtonStyle.success,
-        row=2
-    )
-    async def force_end(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-        if self.finished:
-            await interaction.response.send_message(
-                already_finished_message,
-                ephemeral=True
-            )
-
-            return
-
-        await interaction.response.defer(
-            ephemeral=True
-        )
-
-        if self.sprint_timer is not None:
-            self.sprint_timer.cancel()
-
-        await self.finish_sprint()
-
-        await interaction.followup.send(
-            force_ended_message,
-            ephemeral=True
-        )
-
-
-
-# -------------------------------------------------------
-#                TEST ENDING SOON
-# -------------------------------------------------------
-
-    @discord.ui.button(
-        label="Ending Soon",
-        style=discord.ButtonStyle.success,
-        row=2
-    )
-    async def force_ending_notification(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-        if self.finished:
-            await interaction.response.send_message(
-                already_finished_message,
-                ephemeral=True
-            )
-
-            return
-
-        if not self.started:
-            await interaction.response.send_message(
-                start_first_message,
-                ephemeral=True
-            )
-
-            return
-
-        if len(
-            self.participants
-        ) == 0:
-            await interaction.response.send_message(
-                no_test_participants_message,
-                ephemeral=True
-            )
-
-            return
-
-        await interaction.response.defer(
-            ephemeral=True
-        )
-
-        await self.send_ending_notification()
-
-        await interaction.followup.send(
-            force_ending_message,
-            ephemeral=True
-        )
-
 
 # -------------------------------------------------------
 #                 CHANGE SPRINT TIME MODAL

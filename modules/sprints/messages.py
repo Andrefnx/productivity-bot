@@ -204,28 +204,3 @@ already_started_message = (
 already_finished_message = (
     "This sprint has already finished."
 )
-
-
-# -------------------------------------------------------
-#                   TEST MESSAGES
-# -------------------------------------------------------
-
-force_started_message = (
-    "Sprint forced to start."
-)
-
-force_ending_message = (
-    "Ending notification sent."
-)
-
-force_ended_message = (
-    "Sprint forced to end."
-)
-
-no_test_participants_message = (
-    "There are no participants to notify."
-)
-
-start_first_message = (
-    "Start the sprint first."
-)
