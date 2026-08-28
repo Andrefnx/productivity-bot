@@ -20,6 +20,7 @@ from modules.config import (
     can_create_sprint,
     get_channel_config
 )
+from modules.common.runtime_data import ensure_runtime_data_files
 
 from modules.help import (
     HelpView,
@@ -197,6 +198,7 @@ async def on_ready():
 
 
 if __name__ == "__main__":
+    ensure_runtime_data_files()
     client.run(
         token
     )

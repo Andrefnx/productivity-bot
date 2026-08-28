@@ -6,7 +6,7 @@ DEFAULT_CONFIG = {
     "profile_visibility": "private",
     "projects_visibility": "private",
     "time_format": "12h",
-    "timezone": "America/Punta_Arenas"
+    "timezone": None
 }
 
 

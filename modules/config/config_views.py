@@ -92,6 +92,7 @@ class TimezoneRegionSelect(
         interaction: discord.Interaction
     ):
         self.settings_view.selected_region = self.values[0]
+        self.settings_view.timezone_is_set = True
         self.settings_view.page = 0
         self.settings_view.selected_timezone = get_region_timezones(
             self.settings_view.selected_region,
@@ -141,6 +142,7 @@ class TimezoneSelect(
         interaction: discord.Interaction
     ):
         self.settings_view.selected_timezone = self.values[0]
+        self.settings_view.timezone_is_set = True
         await interaction.response.edit_message(
             embed=self.settings_view.create_embed(),
             view=self.settings_view
@@ -173,13 +175,11 @@ class DateTimeSettingsView(
             "time_format",
             "12h"
         )
-        self.selected_timezone = config.get(
-            "timezone",
-            "America/Punta_Arenas"
-        )
+        self.timezone_is_set = config.get("timezone") is not None
+        self.selected_timezone = config.get("timezone")
         self.selected_region = (
             self.selected_timezone.split("/")[0]
-            if "/" in self.selected_timezone
+            if self.selected_timezone and "/" in self.selected_timezone
             else "Other"
         )
         regions = get_timezone_regions(
@@ -187,6 +187,7 @@ class DateTimeSettingsView(
         )
         if self.selected_region not in regions:
             self.selected_region = regions[0]
+        if self.selected_timezone not in self.timezones:
             self.selected_timezone = get_region_timezones(
                 self.selected_region,
                 self.timezones
@@ -205,10 +206,16 @@ class DateTimeSettingsView(
         self.build_components()
 
     def create_embed(self):
+        timezone = (
+            self.selected_timezone
+            if self.timezone_is_set
+            else "Not set"
+        )
+
         return discord.Embed(
             title="Date & Time",
             description=(
-                f"Timezone: `{self.selected_timezone}`\n"
+                f"Timezone: `{timezone}`\n"
                 f"Time format: `{self.selected_time_format}`"
             )
         )
@@ -276,11 +283,12 @@ class DateTimeSettingsView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
-        update_user_config(
-            self.config_view.owner.id,
-            "timezone",
-            self.selected_timezone
-        )
+        if self.timezone_is_set:
+            update_user_config(
+                self.config_view.owner.id,
+                "timezone",
+                self.selected_timezone
+            )
         update_user_config(
             self.config_view.owner.id,
             "time_format",
@@ -349,8 +357,7 @@ def create_config_embed(
     )
 
     timezone = config.get(
-        "timezone",
-        "America/Punta_Arenas"
+        "timezone"
     )
 
     embed = discord.Embed(
@@ -373,7 +380,7 @@ def create_config_embed(
         name="Date & Time",
         value=(
             f"Time format ✦ **{time_format}**\n"
-            f"Timezone ✦ **{timezone}**"
+            f"Timezone ✦ **{timezone or 'Not set'}**"
         ),
         inline=False
     )
@@ -405,11 +412,8 @@ class DateTimeSettingsModal(
         )
 
         timezone_input = discord.ui.TextInput(
-            default=config.get(
-                "timezone",
-                "America/Punta_Arenas"
-            ),
-            placeholder="America/Punta_Arenas",
+            default=config.get("timezone"),
+            placeholder="UTC or an IANA timezone name",
             required=True,
             max_length=100
         )
@@ -437,7 +441,7 @@ class DateTimeSettingsModal(
                 text="Timezone",
                 description=(
                     "Use a valid IANA timezone name, "
-                    "for example America/Punta_Arenas."
+                    "for example UTC."
                 ),
                 component=timezone_input
             )
