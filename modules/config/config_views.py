@@ -993,9 +993,10 @@ class ConfigView(
         await interaction.response.edit_message(
             embed=discord.Embed(
                 title="Settings",
-                description="Choose User Settings or Channel Settings."
+                description="Choose a settings category."
             ),
             view=ConfigMenuView(
-                owner=self.owner
+                owner=self.owner,
+                guild_id=interaction.guild_id
             )
         )

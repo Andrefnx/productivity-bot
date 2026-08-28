@@ -11,6 +11,7 @@ from .config_views import (
 )
 
 from .permissions import can_edit_channel_config
+from modules.ui_registry import get_settings_registry
 
 
 # -------------------------------------------------------
@@ -22,12 +23,23 @@ class ConfigMenuView(
 ):
     def __init__(
         self,
-        owner
+        owner,
+        guild_id=None
     ):
         super().__init__(
             timeout=180
         )
         self.owner = owner
+        self.guild_id = guild_id
+
+        registry = get_settings_registry()
+        self.add_item(
+            SettingsSelect(
+                registry=registry,
+                owner=owner,
+                guild_id=guild_id
+            )
+        )
 
     async def interaction_check(
         self,
@@ -42,56 +54,48 @@ class ConfigMenuView(
 
         return True
 
-    @discord.ui.button(
-        label="User Settings",
-        style=discord.ButtonStyle.primary
-    )
-    async def user_settings(
+class SettingsSelect(
+    discord.ui.Select
+):
+    def __init__(
         self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
+        registry,
+        owner,
+        guild_id
     ):
-        await interaction.response.edit_message(
-            embed=create_config_embed(
-                self.owner
-            ),
-            view=ConfigView(
-                owner=self.owner
-            )
+        self.registry = registry
+        self.owner = owner
+        self.guild_id = guild_id
+
+        super().__init__(
+            placeholder="Select a settings category",
+            min_values=1,
+            max_values=1,
+            options=[
+                discord.SelectOption(
+                    label=entry.label,
+                    value=entry.key,
+                    description=entry.description
+                )
+                for entry in registry.entries(guild_id=guild_id)
+            ]
         )
 
-    @discord.ui.button(
-        label="Channel Settings",
-        style=discord.ButtonStyle.secondary
-    )
-    async def channel_settings(
+    async def callback(
         self,
         interaction: discord.Interaction,
-        button: discord.ui.Button
     ):
-        if not can_edit_channel_config(
-            interaction.user
+        entry = self.registry.get(self.values[0])
+        if entry not in self.registry.entries(
+            guild_id=interaction.guild_id
         ):
             await interaction.response.send_message(
-                "Administrator or Manage Guild permission required.",
+                "Settings section not found.",
                 ephemeral=True
             )
             return
 
-        if interaction.guild is None or interaction.channel is None:
-            await interaction.response.send_message(
-                "Channel settings are only available in a server channel.",
-                ephemeral=True
-            )
-            return
-
-        await interaction.response.edit_message(
-            embed=create_channel_config_embed(
-                interaction.guild.id,
-                interaction.channel.id
-            ),
-            view=ChannelConfigView(
-                guild_id=interaction.guild.id,
-                channel_id=interaction.channel.id
-            )
+        await entry.renderer(
+            interaction,
+            self.owner
         )

@@ -1,23 +1,11 @@
 import discord
 
 from .help_messages import (
-    GETTING_STARTED_DESCRIPTION,
-    GETTING_STARTED_TITLE,
     HELP_HOME_DESCRIPTION,
-    HELP_HOME_TITLE,
-    IMPORTS_DESCRIPTION,
-    IMPORTS_TITLE,
-    PROFILE_DESCRIPTION,
-    PROFILE_TITLE,
-    PROJECTS_DESCRIPTION,
-    PROJECTS_TITLE,
-    SETTINGS_DESCRIPTION,
-        MARKETPLACE_TITLE,
-        MARKETPLACE_DESCRIPTION,
-    SETTINGS_TITLE,
-    SPRINTS_DESCRIPTION,
-    SPRINTS_TITLE
+    HELP_HOME_TITLE
 )
+
+from modules.ui_registry import get_help_registry
 
 
 # -------------------------------------------------------
@@ -49,44 +37,17 @@ class HelpSelect(
     discord.ui.Select
 ):
     def __init__(
-        self
+        self,
+        guild_id
     ):
+        registry = get_help_registry()
         options = [
             discord.SelectOption(
-                label="Getting Started",
-                value="getting_started",
-                description="Commands and basic navigation"
-            ),
-            discord.SelectOption(
-                label="Sprints",
-                value="sprints",
-                description="Joining, progress and results"
-            ),
-            discord.SelectOption(
-                label="Projects",
-                value="projects",
-                description="Create, edit and organize projects"
-            ),
-            discord.SelectOption(
-                label="Profile",
-                value="profile",
-                description="Your personal bot menu"
-            ),
-            discord.SelectOption(
-                label="Settings",
-                value="settings",
-                description="Privacy, timezone and preferences"
-            ),
-                discord.SelectOption(
-                    label="Marketplace",
-                    value="marketplace",
-                    description="XP, coins, rewards and offers"
-                ),
-            discord.SelectOption(
-                label="Imports",
-                value="imports",
-                description="Import data from other bots"
+                label=entry.label,
+                value=entry.key,
+                description=entry.description
             )
+            for entry in registry.entries(guild_id=guild_id)
         ]
 
         super().__init__(
@@ -116,16 +77,18 @@ class HelpView(
 ):
     def __init__(
         self,
-        owner
+        owner,
+        guild_id=None
     ):
         super().__init__(
             timeout=300
         )
 
         self.owner = owner
+        self.guild_id = guild_id
 
         self.add_item(
-            HelpSelect()
+            HelpSelect(guild_id)
         )
 
     async def interaction_check(
@@ -150,42 +113,12 @@ class HelpView(
         interaction,
         section
     ):
-        sections = {
-            "getting_started": (
-                GETTING_STARTED_TITLE,
-                GETTING_STARTED_DESCRIPTION
-            ),
-            "sprints": (
-                SPRINTS_TITLE,
-                SPRINTS_DESCRIPTION
-            ),
-            "projects": (
-                PROJECTS_TITLE,
-                PROJECTS_DESCRIPTION
-            ),
-            "profile": (
-                PROFILE_TITLE,
-                PROFILE_DESCRIPTION
-            ),
-            "settings": (
-                SETTINGS_TITLE,
-                SETTINGS_DESCRIPTION
-            ),
-                "marketplace": (
-                    MARKETPLACE_TITLE,
-                    MARKETPLACE_DESCRIPTION
-                ),
-            "imports": (
-                IMPORTS_TITLE,
-                IMPORTS_DESCRIPTION
-            )
-        }
+        registry = get_help_registry()
+        entry = registry.get(section)
 
-        section_data = sections.get(
-            section
-        )
-
-        if section_data is None:
+        if entry not in registry.entries(
+            guild_id=interaction.guild_id
+        ):
             await interaction.response.send_message(
                 "Help section not found.",
                 ephemeral=True
@@ -193,9 +126,7 @@ class HelpView(
 
             return
 
-        title, description = (
-            section_data
-        )
+        title, description = entry.renderer()
 
         await interaction.response.edit_message(
             embed=create_section_embed(

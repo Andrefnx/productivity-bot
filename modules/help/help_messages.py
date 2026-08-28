@@ -103,20 +103,6 @@ PROJECTS_DESCRIPTION = (
 
 
 # -------------------------------------------------------
-#                    MARKETPLACE
-# -------------------------------------------------------
-
-MARKETPLACE_TITLE = "Marketplace"
-
-MARKETPLACE_DESCRIPTION = (
-    "Use `/market` to open the marketplace.\n\n"
-    "XP is permanent and determines your level. Coins can be spent without losing XP or levels.\n\n"
-    "Before Level 3, you can browse server rewards. Level 3 unlocks purchases, and Level 10 unlocks creating User Offers.\n\n"
-    "Server Rewards are bot-provided perks. User Offers are services offered by other server members, such as Chibi Drawing, Beta Read, or Accountability Partner."
-)
-
-
-# -------------------------------------------------------
 #                       PROFILE
 # -------------------------------------------------------
 
@@ -146,21 +132,12 @@ PROFILE_DESCRIPTION = (
 SETTINGS_TITLE = "Settings"
 
 SETTINGS_DESCRIPTION = (
-    "Use `/config` or press **Settings** from your profile.\n\n"
-    "**Privacy**\n\n"
-    "You can set your profile and projects to:\n"
-    "• Public\n"
-    "• Private\n\n"
-    "Private content can still always be viewed by you.\n\n"
-    "**Date & Time**\n\n"
-    "You can choose:\n"
-    "• 12-hour time\n"
-    "• 24-hour time\n"
-    "• Your timezone\n\n"
-    "For timezone, use an IANA timezone name such as:\n"
-    "`America/Santiago`\n"
-    "`Europe/Madrid`\n"
-    "`Asia/Tokyo`"
+    "Use `/config` to manage your preferences and server configuration.\n\n"
+    "**User Settings**\n"
+    "Manage your personal privacy, timezone, and time format preferences.\n\n"
+    "**Channel Settings**\n"
+    "Configure sprint permissions, behavior, timing, and empty sprint handling "
+    "for this server."
 )
 
 

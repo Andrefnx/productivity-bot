@@ -138,10 +138,11 @@ async def config(
     await interaction.followup.send(
         embed=discord.Embed(
             title="Settings",
-            description="Choose User Settings or Channel Settings."
+            description="Choose a settings category."
         ),
         view=ConfigMenuView(
-            owner=interaction.user
+            owner=interaction.user,
+            guild_id=interaction.guild_id
         ),
         ephemeral=True
     )
@@ -160,7 +161,8 @@ async def help_command(
     await interaction.response.send_message(
         embed=create_help_embed(),
         view=HelpView(
-            owner=interaction.user
+            owner=interaction.user,
+            guild_id=interaction.guild_id
         ),
         ephemeral=True
     )

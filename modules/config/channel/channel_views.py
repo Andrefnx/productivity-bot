@@ -498,10 +498,11 @@ class ChannelSettingsEditView(
 		await interaction.response.edit_message(
 			embed=discord.Embed(
 				title="Settings",
-				description="Choose User Settings or Channel Settings."
+				description="Choose a settings category."
 			),
 			view=ConfigMenuView(
-				owner=interaction.user
+				owner=interaction.user,
+				guild_id=interaction.guild_id
 			)
 		)
 
@@ -756,9 +757,10 @@ class ChannelConfigView(
 		await interaction.response.edit_message(
 			embed=discord.Embed(
 				title="Settings",
-				description="Choose User Settings or Channel Settings."
+				description="Choose a settings category."
 			),
 			view=ConfigMenuView(
-				owner=interaction.user
+				owner=interaction.user,
+				guild_id=interaction.guild_id
 			)
 		)
