@@ -1,3 +1,4 @@
+import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -10,6 +11,7 @@ from modules.config.config_views import (
 )
 from modules.config.user.user_config import (
     DEFAULT_CONFIG,
+    LEGACY_DEFAULT_TIMEZONE,
     get_user_config
 )
 
@@ -79,6 +81,41 @@ class TimezonePrivacyTests(unittest.TestCase):
 
         self.assertIsNone(config["timezone"])
 
+    def test_legacy_default_timezone_is_migrated_to_none(self):
+        profiles = {
+            "111111111111111111": {
+                "config": {"timezone": LEGACY_DEFAULT_TIMEZONE}
+            }
+        }
+        with patch(
+            "modules.user_profile.profile_storage.load_profiles",
+            return_value=profiles
+        ), patch(
+            "modules.user_profile.profile_storage.save_profiles"
+        ) as save_profiles:
+            config = get_user_config(111111111111111111)
+
+        self.assertIsNone(config["timezone"])
+        self.assertIsNone(profiles["111111111111111111"]["config"]["timezone"])
+        save_profiles.assert_called_once_with(profiles)
+
+    def test_legacy_timezone_migration_is_idempotent(self):
+        profiles = {
+            "111111111111111111": {
+                "config": {"timezone": LEGACY_DEFAULT_TIMEZONE}
+            }
+        }
+        with patch(
+            "modules.user_profile.profile_storage.load_profiles",
+            return_value=profiles
+        ), patch(
+            "modules.user_profile.profile_storage.save_profiles"
+        ) as save_profiles:
+            get_user_config(111111111111111111)
+            get_user_config(111111111111111111)
+
+        self.assertEqual(save_profiles.call_count, 1)
+
     def test_missing_runtime_data_files_are_created(self):
         with TemporaryDirectory() as temporary_directory:
             ensure_runtime_data_files(temporary_directory)
@@ -104,6 +141,27 @@ class TimezonePrivacyTests(unittest.TestCase):
                 (data_directory / "active_sprints.json").read_text(),
                 "[]"
             )
+
+    def test_runtime_initializer_does_not_overwrite_existing_files(self):
+        with TemporaryDirectory() as temporary_directory:
+            data_directory = Path(temporary_directory)
+            profiles_file = data_directory / "profiles.json"
+            profiles_file.write_text('{"existing": true}')
+
+            ensure_runtime_data_files(temporary_directory)
+
+            self.assertEqual(
+                profiles_file.read_text(),
+                '{"existing": true}'
+            )
+
+    def test_runtime_data_and_env_are_ignored(self):
+        gitignore = Path(".gitignore").read_text()
+
+        self.assertIn(".env", gitignore)
+        self.assertIn("data/*.json", gitignore)
+        self.assertIn("!data/.gitkeep", gitignore)
+        self.assertFalse(Path(".env").is_symlink())
 
 
 if __name__ == "__main__":

@@ -9,6 +9,8 @@ DEFAULT_CONFIG = {
     "timezone": None
 }
 
+LEGACY_DEFAULT_TIMEZONE = "America/Punta_Arenas"
+
 
 # -------------------------------------------------------
 #                     CONFIG DATA
@@ -17,7 +19,10 @@ DEFAULT_CONFIG = {
 def get_user_config(
     user_id: int
 ):
-    from modules.user_profile.profile_storage import load_profiles
+    from modules.user_profile.profile_storage import (
+        load_profiles,
+        save_profiles
+    )
 
     profiles = load_profiles()
 
@@ -26,12 +31,16 @@ def get_user_config(
         {}
     )
 
+    saved_config = profile.get("config", {})
+    if saved_config.get("timezone") == LEGACY_DEFAULT_TIMEZONE:
+        saved_config["timezone"] = None
+        profile["config"] = saved_config
+        profiles[str(user_id)] = profile
+        save_profiles(profiles)
+
     config = DEFAULT_CONFIG.copy()
     config.update(
-        profile.get(
-            "config",
-            {}
-        )
+        saved_config
     )
 
     return config
@@ -99,6 +108,7 @@ def update_user_config(
 
 __all__ = [
     "DEFAULT_CONFIG",
+    "LEGACY_DEFAULT_TIMEZONE",
     "get_user_config",
     "update_user_config"
 ]
