@@ -1,5 +1,3 @@
-import os
-
 import discord
 
 from modules.common.entitlements import (
@@ -9,19 +7,12 @@ from modules.common.entitlements import (
 
 
 MAX_NICKNAME_LENGTH = 32
-RESET_NICKNAME = None
 MAX_AVATAR_BYTES = 10 * 1024 * 1024
 ALLOWED_AVATAR_TYPES = {
     "image/png",
     "image/jpeg",
-    "image/webp",
-    "image/gif"
+    "image/webp"
 }
-
-
-def is_bot_owner(user_id):
-    owner_id = os.getenv("BOT_OWNER_ID")
-    return owner_id is not None and str(user_id) == owner_id
 
 
 def validate_nickname(value):
@@ -31,10 +22,7 @@ def validate_nickname(value):
         return None, "Bot name cannot be empty."
 
     if len(nickname) > MAX_NICKNAME_LENGTH:
-        return (
-            None,
-            "Bot name must be 32 characters or fewer."
-        )
+        return None, "Bot name must be 32 characters or fewer."
 
     return nickname, None
 
@@ -72,6 +60,24 @@ async def get_bot_member(interaction):
     )
 
 
+async def require_bot_customization(interaction):
+    if not is_bot_customization_enabled(interaction):
+        await interaction.response.send_message(
+            "This feature is not available in this server.",
+            ephemeral=True
+        )
+        return False
+
+    if not can_manage_bot_appearance(interaction):
+        await interaction.response.send_message(
+            "Manage Guild permission required.",
+            ephemeral=True
+        )
+        return False
+
+    return True
+
+
 class ChangeBotNameModal(discord.ui.Modal):
     def __init__(self, owner_id):
         super().__init__(title="Change Bot Name")
@@ -95,29 +101,12 @@ class ChangeBotNameModal(discord.ui.Modal):
             )
             return
 
-        if not is_bot_customization_enabled(interaction):
-            await interaction.response.send_message(
-                "This feature is not available in this server.",
-                ephemeral=True
-            )
+        if not await require_bot_customization(interaction):
             return
 
-        if not can_manage_bot_appearance(interaction):
-            await interaction.response.send_message(
-                "Manage Guild permission required.",
-                ephemeral=True
-            )
-            return
-
-        nickname, error = validate_nickname(
-            self.nickname_input.value
-        )
-
+        nickname, error = validate_nickname(self.nickname_input.value)
         if error:
-            await interaction.response.send_message(
-                error,
-                ephemeral=True
-            )
+            await interaction.response.send_message(error, ephemeral=True)
             return
 
         bot_member = await get_bot_member(interaction)
@@ -148,7 +137,7 @@ class ChangeBotNameModal(discord.ui.Modal):
 
 class ChangeBotAvatarModal(discord.ui.Modal):
     def __init__(self, owner_id):
-        super().__init__(title="Global Bot Avatar")
+        super().__init__(title="Change Bot Avatar")
         self.owner_id = owner_id
         self.avatar_upload = discord.ui.FileUpload(
             required=True,
@@ -157,28 +146,42 @@ class ChangeBotAvatarModal(discord.ui.Modal):
         )
         self.add_item(
             discord.ui.Label(
-                text="Global bot avatar",
-                description=(
-                    "Upload a PNG, JPEG, WEBP, or GIF image."
-                ),
+                text="Server bot avatar",
+                description="Upload a PNG, JPEG, or WEBP image.",
                 component=self.avatar_upload
             )
         )
 
     async def on_submit(self, interaction):
-        if not is_bot_owner(interaction.user.id):
+        if interaction.user.id != self.owner_id:
             await interaction.response.send_message(
-                "Only the configured bot owner can change the global avatar.",
+                "These settings belong to another user.",
+                ephemeral=True
+            )
+            return
+
+        if not await require_bot_customization(interaction):
+            return
+
+        if not self.avatar_upload.values:
+            await interaction.response.send_message(
+                "Upload a PNG, JPEG, or WEBP image.",
                 ephemeral=True
             )
             return
 
         attachment = self.avatar_upload.values[0]
         content_type = (attachment.content_type or "").lower()
-
         if content_type not in ALLOWED_AVATAR_TYPES:
             await interaction.response.send_message(
-                "Upload a PNG, JPEG, WEBP, or GIF image.",
+                "Upload a PNG, JPEG, or WEBP image.",
+                ephemeral=True
+            )
+            return
+
+        if attachment.size <= 0:
+            await interaction.response.send_message(
+                "The avatar image cannot be empty.",
                 ephemeral=True
             )
             return
@@ -194,28 +197,29 @@ class ChangeBotAvatarModal(discord.ui.Modal):
 
         try:
             avatar = await attachment.read()
-            await interaction.client.user.edit(avatar=avatar)
-        except discord.HTTPException as error:
-            if error.status == 429:
-                message = (
-                    "Discord rate-limited the avatar change. "
-                    "Please wait before trying again."
-                )
-            else:
-                message = "Discord could not update the global bot avatar."
+            if not avatar:
+                raise ValueError("The avatar image cannot be empty.")
+            bot_member = await get_bot_member(interaction)
+            if bot_member is None:
+                raise ValueError("The bot member is unavailable in this server.")
+            await bot_member.edit(avatar=avatar)
+        except ValueError as error:
+            await interaction.followup.send(str(error), ephemeral=True)
+            return
+        except discord.HTTPException:
             await interaction.followup.send(
-                message,
+                "Discord could not update the bot avatar in this server.",
                 ephemeral=True
             )
             return
 
         await interaction.followup.send(
-            "Global bot avatar updated. It may take a moment to appear in every server.",
+            "Bot avatar updated for this server.",
             ephemeral=True
         )
 
 
-class AvatarConfirmationView(discord.ui.View):
+class ResetAppearanceConfirmationView(discord.ui.View):
     def __init__(self, owner_id):
         super().__init__(timeout=120)
         self.owner_id = owner_id
@@ -230,19 +234,49 @@ class AvatarConfirmationView(discord.ui.View):
         return True
 
     @discord.ui.button(
-        label="Confirm Global Avatar Change",
+        label="Reset Appearance",
         style=discord.ButtonStyle.danger
     )
     async def confirm(self, interaction, button):
-        if not is_bot_owner(interaction.user.id):
+        if not await require_bot_customization(interaction):
+            return
+
+        bot_member = await get_bot_member(interaction)
+        if (
+            bot_member is None
+            or not bot_member.guild_permissions.change_nickname
+        ):
             await interaction.response.send_message(
-                "Only the configured bot owner can change the global avatar.",
+                "I don't have permission to reset my appearance in this server.",
                 ephemeral=True
             )
             return
 
-        await interaction.response.send_modal(
-            ChangeBotAvatarModal(self.owner_id)
+        try:
+            await bot_member.edit(nick=None, avatar=None)
+        except (discord.Forbidden, discord.HTTPException):
+            await interaction.response.send_message(
+                "Discord could not reset the bot appearance in this server.",
+                ephemeral=True
+            )
+            return
+
+        await interaction.response.edit_message(
+            embed=discord.Embed(
+                title="Bot Appearance",
+                description="Bot appearance reset for this server."
+            ),
+            view=None
+        )
+
+    @discord.ui.button(
+        label="Cancel",
+        style=discord.ButtonStyle.secondary
+    )
+    async def cancel(self, interaction, button):
+        await interaction.response.edit_message(
+            embed=create_bot_appearance_embed(),
+            view=BotAppearanceView(interaction.user)
         )
 
 
@@ -250,9 +284,6 @@ class BotAppearanceView(discord.ui.View):
     def __init__(self, owner):
         super().__init__(timeout=180)
         self.owner = owner
-
-        if not is_bot_owner(owner.id):
-            self.remove_item(self.global_avatar)
 
     async def interaction_check(self, interaction):
         if interaction.user.id != self.owner.id:
@@ -265,105 +296,40 @@ class BotAppearanceView(discord.ui.View):
 
     @discord.ui.button(
         label="Change Bot Name",
-        style=discord.ButtonStyle.primary
-    )
-    async def change_name(self, interaction, button):
-        if not is_bot_customization_enabled(interaction):
-            await interaction.response.send_message(
-                "This feature is not available in this server.",
-                ephemeral=True
-            )
-            return
-
-        if interaction.guild is None:
-            await interaction.response.send_message(
-                "Bot appearance is only available in a server.",
-                ephemeral=True
-            )
-            return
-
-        if not can_manage_bot_appearance(interaction):
-            await interaction.response.send_message(
-                "Manage Guild permission required.",
-                ephemeral=True
-            )
-            return
-
-        await interaction.response.send_modal(
-            ChangeBotNameModal(self.owner.id)
-        )
-
-    @discord.ui.button(
-        label="Reset Bot Name",
         style=discord.ButtonStyle.secondary
     )
-    async def reset_name(self, interaction, button):
-        if not is_bot_customization_enabled(interaction):
-            await interaction.response.send_message(
-                "This feature is not available in this server.",
-                ephemeral=True
-            )
+    async def change_name(self, interaction, button):
+        if not await require_bot_customization(interaction):
             return
 
-        if interaction.guild is None:
-            await interaction.response.send_message(
-                "Bot appearance is only available in a server.",
-                ephemeral=True
-            )
-            return
-
-        if not can_manage_bot_appearance(interaction):
-            await interaction.response.send_message(
-                "Manage Guild permission required.",
-                ephemeral=True
-            )
-            return
-
-        bot_member = await get_bot_member(interaction)
-        if (
-            bot_member is None
-            or not bot_member.guild_permissions.change_nickname
-        ):
-            await interaction.response.send_message(
-                "I don't have permission to change my nickname in this server.",
-                ephemeral=True
-            )
-            return
-
-        try:
-            await bot_member.edit(nick=RESET_NICKNAME)
-        except (discord.Forbidden, discord.HTTPException):
-            await interaction.response.send_message(
-                "I don't have permission to change my nickname in this server.",
-                ephemeral=True
-            )
-            return
-
-        await interaction.response.send_message(
-            "Bot name reset for this server.",
-            ephemeral=True
-        )
+        await interaction.response.send_modal(ChangeBotNameModal(self.owner.id))
 
     @discord.ui.button(
-        label="Global Bot Avatar",
+        label="Change Bot Avatar",
+        style=discord.ButtonStyle.secondary
+    )
+    async def change_avatar(self, interaction, button):
+        if not await require_bot_customization(interaction):
+            return
+
+        await interaction.response.send_modal(ChangeBotAvatarModal(self.owner.id))
+
+    @discord.ui.button(
+        label="Reset Appearance",
         style=discord.ButtonStyle.danger
     )
-    async def global_avatar(self, interaction, button):
-        if not is_bot_owner(interaction.user.id):
-            await interaction.response.send_message(
-                "Only the configured bot owner can change the global avatar.",
-                ephemeral=True
-            )
+    async def reset_appearance(self, interaction, button):
+        if not await require_bot_customization(interaction):
             return
 
         await interaction.response.send_message(
             embed=discord.Embed(
-                title="Global Bot Avatar",
+                title="Reset Bot Appearance",
                 description=(
-                    "This will change the bot avatar in every server."
+                    "This will reset the bot name and avatar for this server."
                 )
             ),
-            view=AvatarConfirmationView(self.owner.id),
+            view=ResetAppearanceConfirmationView(self.owner.id),
             ephemeral=True
         )
 
@@ -371,10 +337,7 @@ class BotAppearanceView(discord.ui.View):
 def create_bot_appearance_embed():
     return discord.Embed(
         title="Bot Appearance",
-        description=(
-            "Customize the bot name for this server. "
-            "The global avatar changes in every server."
-        )
+        description="Customize the bot name and avatar for this server."
     )
 
 

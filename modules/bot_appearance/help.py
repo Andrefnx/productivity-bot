@@ -5,14 +5,13 @@ BOT_PROFILE_CUSTOMIZATION_TITLE = "Bot Profile Customization"
 
 BOT_PROFILE_CUSTOMIZATION_DESCRIPTION = (
     "Use `/config` and select **Bot Appearance** to customize "
-    "how the bot appears.\n\n"
+    "how the bot appears in this server.\n\n"
     "**Server bot name**\n"
     "Change the bot nickname for this server.\n\n"
-    "**Reset bot name**\n"
-    "Restore the bot's default/global name in this server.\n\n"
-    "**Global bot avatar**\n"
-    "Change the bot avatar across all servers. Only available "
-    "to the configured bot owner."
+    "**Server bot avatar**\n"
+    "Upload a custom avatar for the bot in this server.\n\n"
+    "**Reset appearance**\n"
+    "Restore the bot's default name and avatar in this server."
 )
 
 
