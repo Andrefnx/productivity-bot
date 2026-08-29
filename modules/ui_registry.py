@@ -1,12 +1,10 @@
 from importlib import import_module
 from pathlib import Path
 
-import modules
-
 from modules.common.ui.registry import UIRegistry
 
 
-MODULES_ROOT = Path(modules.__file__).resolve().parent
+MODULES_ROOT = Path(__file__).resolve().parent
 
 
 def _iter_module_contributors(filename, register_name):
