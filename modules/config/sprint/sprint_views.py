@@ -45,14 +45,17 @@ SPRINT_SETTING_LABELS = {
 
 
 def create_sprint_settings_embed(
-	sprint_view
+	sprint_view,
+	config=None
 ):
 	embed = discord.Embed(
-		title="Sprint Settings",
+		title="Sprint Settings / Edit Settings",
 		description="Overrides apply only to this sprint session."
 	)
 
-	for key, value in sprint_view.sprint_config.items():
+	shown_config = sprint_view.sprint_config if config is None else config
+
+	for key, value in shown_config.items():
 		shown_value = (
 			"Inherit"
 			if value is None
@@ -119,14 +122,15 @@ class SprintSettingSelect(
 			value = int(value)
 
 		set_sprint_override(
-			self.settings_view.sprint_view.sprint_config,
+			self.settings_view.draft_config,
 			self.key,
 			value
 		)
 
 		await interaction.response.edit_message(
 			embed=create_sprint_settings_embed(
-				self.settings_view.sprint_view
+				self.settings_view.sprint_view,
+				self.settings_view.draft_config
 			),
 			view=self.settings_view
 		)
@@ -141,15 +145,20 @@ class SprintSettingsView(
 ):
 	def __init__(
 		self,
-		sprint_view
+		sprint_view,
+		back_view=None
 	):
 		super().__init__(
 			timeout=120
 		)
 		self.sprint_view = sprint_view
+		self.back_view = back_view
+		self.draft_config = create_sprint_config(
+			sprint_view.sprint_config
+		)
 
 		for row, key in enumerate(
-			sprint_view.sprint_config
+			self.draft_config
 		):
 			self.add_item(
 				SprintSettingSelect(
@@ -158,6 +167,9 @@ class SprintSettingsView(
 					row
 				)
 			)
+
+		self.add_item(SaveSprintSettingsButton(self))
+		self.add_item(BackSprintSettingsButton(self))
 
 	async def interaction_check(
 		self,
@@ -174,3 +186,47 @@ class SprintSettingsView(
 			return False
 
 		return True
+
+
+class SaveSprintSettingsButton(discord.ui.Button):
+	def __init__(self, settings_view):
+		self.settings_view = settings_view
+		super().__init__(
+			label="Save",
+			style=discord.ButtonStyle.primary,
+			row=4
+		)
+
+	async def callback(self, interaction: discord.Interaction):
+		self.settings_view.sprint_view.sprint_config.clear()
+		self.settings_view.sprint_view.sprint_config.update(
+			self.settings_view.draft_config
+		)
+		await interaction.response.edit_message(
+			embed=discord.Embed(
+				title="Sprint Settings",
+				description="Settings saved. Choose an action."
+			),
+			view=self.settings_view.back_view
+		)
+		self.settings_view.stop()
+
+
+class BackSprintSettingsButton(discord.ui.Button):
+	def __init__(self, settings_view):
+		self.settings_view = settings_view
+		super().__init__(
+			label="↩ Back",
+			style=discord.ButtonStyle.secondary,
+			row=4
+		)
+
+	async def callback(self, interaction: discord.Interaction):
+		await interaction.response.edit_message(
+			embed=discord.Embed(
+				title="Sprint Settings",
+				description="Choose an action."
+			),
+			view=self.settings_view.back_view
+		)
+		self.settings_view.stop()
