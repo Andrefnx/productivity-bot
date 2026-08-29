@@ -11,7 +11,7 @@ from modules.user_profile.profile import (
 from modules.user_profile.projects import (
     ProjectPickerView,
     create_project_picker_embed,
-    update_project
+    add_project_words
 )
 
 
@@ -24,7 +24,8 @@ class SprintUser:
         self,
         user,
         sprint_id: str,
-        project
+        project=None,
+        initial_wc=0
     ):
         self.user = user
         self.user_id = user.id
@@ -39,25 +40,9 @@ class SprintUser:
             uuid.uuid4()
         )
 
-        self.project_id = (
-            project[
-                "project_id"
-            ]
-        )
-
-        self.project = (
-            project.get(
-                "name",
-                "Untitled"
-            )
-        )
-
-        self.initial_wc = (
-            project.get(
-                "wordcount",
-                0
-            )
-        )
+        self.project_id = project.get("project_id") if project else None
+        self.project = project.get("name", "Untitled") if project else "No project"
+        self.initial_wc = initial_wc
 
         self.final_wc = None
         self.words_written = None
@@ -68,7 +53,8 @@ class SprintUser:
 
         self.activity_history = []
 
-        self.set_last_project()
+        if self.project_id is not None:
+            self.set_last_project()
 
     @property
     def mention(
@@ -112,11 +98,12 @@ class SprintUser:
         if (
             registered
             and final_wc is not None
+            and self.project_id is not None
         ):
-            update_project(
+            add_project_words(
                 user_id=self.user_id,
                 project_id=self.project_id,
-                wordcount=final_wc
+                words=max(words_written or 0, 0)
             )
 
     def switch_project(
@@ -175,7 +162,8 @@ class SprintParticipants:
     def add_user(
         self,
         user,
-        project
+        project=None,
+        initial_wc=0
     ):
         if user.id in self.users:
             return False
@@ -183,7 +171,8 @@ class SprintParticipants:
         sprint_user = SprintUser(
             user=user,
             sprint_id=self.sprint_id,
-            project=project
+            project=project,
+            initial_wc=initial_wc
         )
 
         self.users[
@@ -302,6 +291,7 @@ class JoinSprintView(
             on_confirm=self.join_project,
             show_last_project=True
         )
+        self.add_item(self.no_project)
 
     async def join_project(
         self,
@@ -329,11 +319,104 @@ class JoinSprintView(
 
             return
 
-        added = (
-            self.sprint_view.participants.add_user(
-                user=interaction.user,
+        await interaction.response.edit_message(
+            content=None,
+            embed=discord.Embed(
+                title="Starting Word Count",
+                description=(
+                    f"**{project['name']}**\n"
+                    "Choose **Total** to use the project total, or "
+                    "**Custom** to start from 0 or another value."
+                )
+            ),
+            view=StartWordCountView(
+                sprint_view=self.sprint_view,
+                user_id=interaction.user.id,
                 project=project
             )
+        )
+
+    @discord.ui.button(
+        label="No Project",
+        style=discord.ButtonStyle.secondary,
+        row=3
+    )
+    async def no_project(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await interaction.response.edit_message(
+            content=None,
+            embed=discord.Embed(
+                title="Starting Word Count",
+                description=(
+                    "Choose **Custom** to start from 0 or another value."
+                )
+            ),
+            view=StartWordCountView(
+                sprint_view=self.sprint_view,
+                user_id=interaction.user.id,
+                project=None
+            )
+        )
+
+
+class StartWordCountModal(discord.ui.Modal):
+    def __init__(self, start_view):
+        super().__init__(title="Custom Starting Word Count")
+        self.start_view = start_view
+        self.wordcount_input = discord.ui.TextInput(
+            label="Starting word count",
+            default="0",
+            required=True,
+            max_length=12
+        )
+        self.add_item(self.wordcount_input)
+
+    async def on_submit(self, interaction):
+        try:
+            initial_wc = int(self.wordcount_input.value.strip())
+            if initial_wc < 0:
+                raise ValueError
+        except ValueError:
+            await interaction.response.send_message(
+                "Starting word count must be a whole number of 0 or more.",
+                ephemeral=True
+            )
+            return
+
+        await self.start_view.add_participant(interaction, initial_wc)
+
+
+class StartWordCountView(discord.ui.View):
+    def __init__(self, sprint_view, user_id, project):
+        super().__init__(timeout=120)
+        self.sprint_view = sprint_view
+        self.user_id = user_id
+        self.project = project
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "This join menu belongs to another user.",
+                ephemeral=True
+            )
+            return False
+        return True
+
+    async def add_participant(self, interaction, initial_wc):
+        if self.sprint_view.participants.has_user(interaction.user.id):
+            await interaction.response.send_message(
+                "You are already in this sprint.",
+                ephemeral=True
+            )
+            return
+
+        added = self.sprint_view.participants.add_user(
+            user=interaction.user,
+            project=self.project,
+            initial_wc=initial_wc
         )
 
         if not added:
@@ -344,16 +427,40 @@ class JoinSprintView(
 
             return
 
+        project_name = self.project.get("name") if self.project else "No project"
         await interaction.response.edit_message(
             content=None,
             embed=discord.Embed(
                 title="Joined sprint",
                 description=(
-                    f"**{project['name']}** ✦ "
-                    f"{project.get('wordcount', 0):,} words"
+                    f"**{project_name}** ✦ {initial_wc:,} words"
                 )
             ),
             view=None
         )
 
         await self.sprint_view.update_current_message()
+
+    @discord.ui.button(
+        label="Custom",
+        style=discord.ButtonStyle.secondary
+    )
+    async def custom(self, interaction, button):
+        await interaction.response.send_modal(StartWordCountModal(self))
+
+    @discord.ui.button(
+        label="Total",
+        style=discord.ButtonStyle.secondary
+    )
+    async def total(self, interaction, button):
+        if self.project is None:
+            await interaction.response.send_message(
+                "Total is only available when you select a project.",
+                ephemeral=True
+            )
+            return
+
+        await self.add_participant(
+            interaction,
+            int(self.project.get("wordcount", 0))
+        )

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 from modules.config.channel.channel_config import DEFAULT_CHANNEL_CONFIG
 from modules.config.sprint.sprint_config import DEFAULT_SPRINT_CONFIG
 from modules.sprints.active_sprint import SprintView
-from modules.sprints.users import JoinSprintView
+from modules.sprints.users import JoinSprintView, StartWordCountView
 
 
 class SprintJoinTests(unittest.TestCase):
@@ -66,7 +66,7 @@ class SprintJoinTests(unittest.TestCase):
         )
         print_mock.assert_any_call("ERROR OPENING SPRINT JOIN:")
 
-    def test_join_project_adds_existing_project_without_timezone_change(self):
+    def test_join_project_opens_start_word_count_choice(self):
         sprint = self.create_sprint()
         interaction = self.create_interaction()
         project = {
@@ -75,19 +75,34 @@ class SprintJoinTests(unittest.TestCase):
             "wordcount": 100
         }
         join_view = JoinSprintView(sprint, interaction.user.id)
+        with patch.dict("os.environ", {}, clear=True):
+            asyncio.run(join_view.join_project(interaction, project))
+
+        self.assertFalse(sprint.participants.has_user(interaction.user.id))
+        self.assertIsInstance(
+            interaction.response.edit_message.await_args.kwargs["view"],
+            StartWordCountView
+        )
+
+    def test_total_start_adds_existing_project_without_timezone_change(self):
+        sprint = self.create_sprint()
+        interaction = self.create_interaction()
+        project = {
+            "project_id": "project-1",
+            "name": "Test Project",
+            "wordcount": 100
+        }
+        start_view = StartWordCountView(sprint, interaction.user.id, project)
         sprint.update_current_message = AsyncMock()
 
-        with patch(
-            "modules.sprints.users.set_last_project"
-        ), patch.dict("os.environ", {}, clear=True):
-            asyncio.run(join_view.join_project(interaction, project))
+        with patch("modules.sprints.users.set_last_project"):
+            asyncio.run(start_view.total.callback(interaction))
 
         self.assertTrue(sprint.participants.has_user(interaction.user.id))
         self.assertEqual(
             sprint.participants.get_user(interaction.user.id).initial_wc,
             100
         )
-        interaction.response.edit_message.assert_awaited_once()
         sprint.update_current_message.assert_awaited_once()
 
     def test_leave_still_responds_and_removes_participant(self):

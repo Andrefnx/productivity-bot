@@ -19,6 +19,7 @@ DEFAULT_PROFILE = {
     "xp": 0,
     "level": 1,
     "last_project_id": None,
+    "words_outside_projects": 0,
     "imports": {},
     "economy": {
         "coins": 0,
@@ -113,6 +114,24 @@ def get_profile(
     return profile
 
 
+def add_words_outside_projects(
+    user_id: int,
+    words: int
+):
+    if words <= 0:
+        return get_profile(user_id)
+
+    profile = get_profile(user_id)
+    profile["words_outside_projects"] = int(
+        profile.get("words_outside_projects", 0)
+    ) + words
+
+    return update_profile(
+        user_id,
+        {"words_outside_projects": profile["words_outside_projects"]}
+    )
+
+
 def update_profile(
     user_id: int,
     data: dict
@@ -139,6 +158,17 @@ def update_profile(
     save_profiles(
         profiles
     )
+
+
+def clear_last_project_if_matches(
+    user_id: int,
+    project_id: str
+):
+    profile = get_profile(user_id)
+    if profile.get("last_project_id") != project_id:
+        return
+
+    update_profile(user_id, {"last_project_id": None})
 
     return profile
 

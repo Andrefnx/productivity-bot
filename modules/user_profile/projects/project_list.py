@@ -225,6 +225,41 @@ def update_project(
     return project
 
 
+def add_project_words(
+    user_id: int,
+    project_id: str,
+    words: int
+):
+    if words <= 0:
+        return get_project(user_id, project_id)
+
+    project = get_project(user_id, project_id)
+    if project is None:
+        return None
+
+    return update_project(
+        user_id=user_id,
+        project_id=project_id,
+        wordcount=int(project.get("wordcount", 0)) + words
+    )
+
+
+def delete_project(
+    user_id: int,
+    project_id: str
+):
+    projects = load_projects()
+    user_projects = projects.get(str(user_id), {})
+
+    if project_id not in user_projects:
+        return False
+
+    del user_projects[project_id]
+    projects[str(user_id)] = user_projects
+    save_projects(projects)
+    return True
+
+
 # -------------------------------------------------------
 #                   PROJECT DATES
 # -------------------------------------------------------

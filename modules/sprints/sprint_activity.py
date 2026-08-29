@@ -23,8 +23,9 @@ from .sprint_results import (
 
 from modules.user_profile.projects import (
     ProjectPickerView,
-    update_project
+    add_project_words
 )
+from modules.user_profile.profile_storage import add_words_outside_projects
 
 from .system_messages import (
     create_finished_embed,
@@ -75,11 +76,7 @@ def register_new_total(
 
     sprint_user.result_registered = True
 
-    update_project(
-        user_id=sprint_user.user_id,
-        project_id=sprint_user.project_id,
-        wordcount=new_total
-    )
+    apply_positive_progress(sprint_user, current_words)
 
 
 def register_difference(
@@ -102,10 +99,25 @@ def register_difference(
 
     sprint_user.result_registered = True
 
-    update_project(
+    apply_positive_progress(sprint_user, difference)
+
+
+def apply_positive_progress(sprint_user, progress):
+    positive_progress = max(progress, 0)
+    if positive_progress == 0:
+        return
+
+    if sprint_user.project_id is None:
+        add_words_outside_projects(
+            sprint_user.user_id,
+            positive_progress
+        )
+        return
+
+    add_project_words(
         user_id=sprint_user.user_id,
         project_id=sprint_user.project_id,
-        wordcount=final_wc
+        words=positive_progress
     )
 
 

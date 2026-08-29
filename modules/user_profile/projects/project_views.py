@@ -13,6 +13,9 @@ from .project_list import (
     update_project
 )
 
+from .project_list import delete_project
+from modules.user_profile.profile_storage import clear_last_project_if_matches
+
 from .project_modals import (
     CreateProjectModal,
     EditProjectModal
@@ -757,6 +760,38 @@ class ProjectDetailView(
             ),
             view=UserProjectsView(
                 owner=self.owner
+            )
+        )
+
+    @discord.ui.button(
+        label="Delete Project",
+        style=discord.ButtonStyle.danger,
+        row=2
+    )
+    async def delete_project_button(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        project = get_project(self.owner.id, self.project_id)
+        if project is None:
+            await interaction.response.send_message(
+                "Project not found.",
+                ephemeral=True
+            )
+            return
+
+        await interaction.response.edit_message(
+            embed=discord.Embed(
+                title=f"Delete \"{project.get('name', 'Untitled')}\"?",
+                description=(
+                    "This permanently deletes this project.\n"
+                    "This action cannot be undone."
+                )
+            ),
+            view=DeleteProjectConfirmationView(
+                self.owner,
+                self.project_id
             )
         )
 
