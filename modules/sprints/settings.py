@@ -15,6 +15,19 @@ SPRINT_SETTING_LABELS = {
     "empty_sprint_timeout": "Empty sprint timeout"
 }
 
+BOOLEAN_SETTING_VALUES = (
+    ("Inherit", "inherit"),
+    ("Allowed", "allowed"),
+    ("Disabled", "disabled")
+)
+
+TIMEOUT_SETTING_VALUES = (
+    ("Inherit", "inherit"),
+    ("30 seconds", "30"),
+    ("60 seconds", "60"),
+    ("120 seconds", "120")
+)
+
 
 class SprintConfigView(discord.ui.View):
     def __init__(self, overrides=None):
@@ -26,27 +39,31 @@ class SprintConfigView(discord.ui.View):
         return self.config.copy()
 
 
-def create_sprint_settings_embed(sprint_view, config=None):
-    embed = discord.Embed(
-        title="Sprint Settings / Edit Settings",
-        description="Overrides apply only to this sprint session."
-    )
+def format_sprint_setting_value(value):
+    if value is None:
+        return "Inherit"
+    if value is True:
+        return "Allowed"
+    if value is False:
+        return "Disabled"
+    return f"{value} seconds"
 
+
+def create_sprint_settings_embed(sprint_view, config=None):
     shown_config = sprint_view.sprint_config if config is None else config
 
-    for key, value in shown_config.items():
-        shown_value = (
-            "Inherit"
-            if value is None
-            else "Allowed"
-            if value is True
-            else "Disabled"
-            if value is False
-            else f"{value} seconds"
+    embed = discord.Embed(
+        title="Sprint Settings / Edit Settings",
+        description=(
+            "Choose changes below, then press **Save**. "
+            "Use **↩ Back** to discard unsaved changes."
         )
+    )
+
+    for key, value in shown_config.items():
         embed.add_field(
             name=SPRINT_SETTING_LABELS[key],
-            value=shown_value,
+            value=format_sprint_setting_value(value),
             inline=False
         )
 
@@ -54,43 +71,56 @@ def create_sprint_settings_embed(sprint_view, config=None):
 
 
 class SprintSettingSelect(discord.ui.Select):
-    def __init__(self, settings_view, key, row):
+    def __init__(self, settings_view):
         self.settings_view = settings_view
-        self.key = key
-        options = [
-            discord.SelectOption(label="Inherit", value="inherit"),
-            discord.SelectOption(label="Allowed", value="allowed"),
-            discord.SelectOption(label="Disabled", value="disabled")
-        ]
+        options = []
 
-        if key == "empty_sprint_timeout":
-            options = [
-                discord.SelectOption(label="Inherit", value="inherit"),
-                discord.SelectOption(label="30 seconds", value="30"),
-                discord.SelectOption(label="60 seconds", value="60"),
-                discord.SelectOption(label="120 seconds", value="120")
-            ]
+        for key, label in SPRINT_SETTING_LABELS.items():
+            values = (
+                TIMEOUT_SETTING_VALUES
+                if key == "empty_sprint_timeout"
+                else BOOLEAN_SETTING_VALUES
+            )
+
+            for shown_value, stored_value in values:
+                options.append(
+                    discord.SelectOption(
+                        label=f"{label}: {shown_value}"[:100],
+                        value=f"{key}|{stored_value}",
+                        description=(
+                            "Current: "
+                            + format_sprint_setting_value(
+                                settings_view.draft_config.get(key)
+                            )
+                        )[:100]
+                    )
+                )
 
         super().__init__(
-            placeholder=SPRINT_SETTING_LABELS[key],
+            placeholder="Change a sprint setting",
+            min_values=1,
+            max_values=1,
             options=options,
-            row=row
+            row=0
         )
 
     async def callback(self, interaction: discord.Interaction):
-        value = self.values[0]
-        if value == "inherit":
+        key, raw_value = self.values[0].split("|", 1)
+
+        if raw_value == "inherit":
             value = None
-        elif self.key != "empty_sprint_timeout":
-            value = value == "allowed"
+        elif key == "empty_sprint_timeout":
+            value = int(raw_value)
         else:
-            value = int(value)
+            value = raw_value == "allowed"
 
         set_sprint_override(
             self.settings_view.draft_config,
-            self.key,
+            key,
             value
         )
+
+        self.settings_view.refresh_components()
 
         await interaction.response.edit_message(
             embed=create_sprint_settings_embed(
@@ -107,10 +137,11 @@ class SprintSettingsView(discord.ui.View):
         self.sprint_view = sprint_view
         self.back_view = back_view
         self.draft_config = create_sprint_config(sprint_view.sprint_config)
+        self.refresh_components()
 
-        for row, key in enumerate(self.draft_config):
-            self.add_item(SprintSettingSelect(self, key, row))
-
+    def refresh_components(self):
+        self.clear_items()
+        self.add_item(SprintSettingSelect(self))
         self.add_item(SaveSprintSettingsButton(self))
         self.add_item(BackSprintSettingsButton(self))
 
@@ -134,7 +165,7 @@ class SaveSprintSettingsButton(discord.ui.Button):
         super().__init__(
             label="Save",
             style=discord.ButtonStyle.primary,
-            row=4
+            row=1
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -159,7 +190,7 @@ class BackSprintSettingsButton(discord.ui.Button):
         super().__init__(
             label="↩ Back",
             style=discord.ButtonStyle.secondary,
-            row=4
+            row=1
         )
 
     async def callback(self, interaction: discord.Interaction):
