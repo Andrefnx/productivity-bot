@@ -1,6 +1,12 @@
-from modules.help.help_messages import (
-    SETTINGS_DESCRIPTION,
-    SETTINGS_TITLE
+SETTINGS_TITLE = "Settings"
+
+SETTINGS_DESCRIPTION = (
+    "Use `/config` to manage your preferences and server configuration.\n\n"
+    "**User Settings**\n"
+    "Manage your personal privacy, timezone, and time format preferences.\n\n"
+    "**Channel Settings**\n"
+    "Configure sprint permissions, behavior, timing, and empty sprint handling "
+    "for this server."
 )
 
 
