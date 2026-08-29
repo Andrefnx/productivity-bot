@@ -508,7 +508,7 @@ class ProjectPickerView(
         )
 
     @discord.ui.button(
-        label="📚 Select Project",
+        label="Select Project",
         style=discord.ButtonStyle.primary,
         row=1
     )
@@ -589,7 +589,7 @@ class ProjectPickerView(
         )
 
     @discord.ui.button(
-        label="↩️ Use Last Project",
+        label="Use Last Project",
         style=discord.ButtonStyle.secondary,
         row=3
     )
@@ -747,7 +747,7 @@ class ProjectDetailView(
     @discord.ui.button(
         label="↩ Back to Projects",
         style=discord.ButtonStyle.secondary,
-        row=1
+        row=3
     )
     async def back_projects(
         self,
@@ -766,7 +766,7 @@ class ProjectDetailView(
     @discord.ui.button(
         label="Delete Project",
         style=discord.ButtonStyle.danger,
-        row=2
+        row=1
     )
     async def delete_project_button(
         self,
@@ -800,9 +800,9 @@ class ProjectDetailView(
 # -------------------------------------------------------
 
     @discord.ui.button(
-        label="↩Back to Profile",
+        label="↩ Back to Profile",
         style=discord.ButtonStyle.secondary,
-        row=4
+        row=3
     )
     async def back_profile(
         self,
@@ -1102,7 +1102,7 @@ class UserProjectsView(
         )
 
     @discord.ui.button(
-        label="↩Back to Profile",
+        label="↩ Back to Profile",
         style=discord.ButtonStyle.secondary,
         row=4
     )

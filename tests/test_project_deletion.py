@@ -1,7 +1,9 @@
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from modules.user_profile.projects.project_list import delete_project
+from modules.user_profile.projects.project_views import ProjectDetailView
 
 
 class ProjectDeletionTests(unittest.TestCase):
@@ -31,3 +33,21 @@ class ProjectDeletionTests(unittest.TestCase):
             return_value={}
         ):
             self.assertFalse(delete_project(111111111111111111, "missing"))
+
+    def test_detail_groups_actions_and_navigation(self):
+        owner = SimpleNamespace(id=111111111111111111)
+        with patch(
+            "modules.user_profile.projects.project_views.get_project",
+            return_value={"project_id": "project", "name": "Project"}
+        ):
+            view = ProjectDetailView(owner, "project")
+
+        buttons = {
+            item.label: item.row
+            for item in view.children
+            if getattr(item, "label", None)
+        }
+        self.assertEqual(buttons["Edit Details"], 1)
+        self.assertEqual(buttons["Delete Project"], 1)
+        self.assertEqual(buttons["↩ Back to Projects"], 3)
+        self.assertEqual(buttons["↩ Back to Profile"], 3)

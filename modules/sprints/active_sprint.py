@@ -91,7 +91,7 @@ class ConfirmationView(
         self.stop()
 
     @discord.ui.button(
-        label="↩️ Go Back",
+        label="↩ Back",
         style=discord.ButtonStyle.secondary
     )
     async def go_back(

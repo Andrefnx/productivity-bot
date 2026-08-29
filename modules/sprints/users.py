@@ -396,6 +396,9 @@ class StartWordCountView(discord.ui.View):
         self.user_id = user_id
         self.project = project
 
+        if project is None:
+            self.remove_item(self.total)
+
     async def interaction_check(self, interaction):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message(
@@ -455,14 +458,22 @@ class StartWordCountView(discord.ui.View):
         style=discord.ButtonStyle.secondary
     )
     async def total(self, interaction, button):
-        if self.project is None:
-            await interaction.response.send_message(
-                "Total is only available when you select a project.",
-                ephemeral=True
-            )
-            return
-
         await self.add_participant(
             interaction,
             int(self.project.get("wordcount", 0))
+        )
+
+    @discord.ui.button(
+        label="↩ Back",
+        style=discord.ButtonStyle.secondary,
+        row=1
+    )
+    async def back(self, interaction, button):
+        await interaction.response.edit_message(
+            content=None,
+            embed=create_project_picker_embed(),
+            view=JoinSprintView(
+                sprint_view=self.sprint_view,
+                user_id=self.user_id
+            )
         )

@@ -239,7 +239,7 @@ class ProfileView(
 # -------------------------------------------------------
 
     @discord.ui.button(
-        label="⚙ Settings",
+        label="Settings",
         style=discord.ButtonStyle.secondary
     )
     async def settings(

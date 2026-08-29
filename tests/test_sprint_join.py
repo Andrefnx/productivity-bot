@@ -105,6 +105,61 @@ class SprintJoinTests(unittest.TestCase):
         )
         sprint.update_current_message.assert_awaited_once()
 
+    def test_back_from_project_allows_joining_without_project(self):
+        sprint = self.create_sprint()
+        interaction = self.create_interaction()
+        project = {
+            "project_id": "project-1",
+            "name": "Test Project",
+            "wordcount": 100
+        }
+        start_view = StartWordCountView(sprint, interaction.user.id, project)
+
+        with patch(
+            "modules.user_profile.projects.project_views.get_user_projects",
+            return_value=[]
+        ):
+            asyncio.run(start_view.back.callback(interaction))
+
+        picker = interaction.response.edit_message.await_args.kwargs["view"]
+        self.assertIsInstance(picker, JoinSprintView)
+
+        asyncio.run(picker.no_project.callback(interaction))
+        no_project_view = interaction.response.edit_message.await_args.kwargs["view"]
+        self.assertIsNone(no_project_view.project)
+        self.assertFalse(sprint.participants.has_user(interaction.user.id))
+
+    def test_back_allows_selecting_another_project_once(self):
+        sprint = self.create_sprint()
+        interaction = self.create_interaction()
+        project_a = {"project_id": "a", "name": "A", "wordcount": 1}
+        project_b = {"project_id": "b", "name": "B", "wordcount": 200}
+        start_view = StartWordCountView(sprint, interaction.user.id, project_a)
+        sprint.update_current_message = AsyncMock()
+
+        with patch(
+            "modules.user_profile.projects.project_views.get_user_projects",
+            return_value=[]
+        ), patch("modules.sprints.users.set_last_project"):
+            asyncio.run(start_view.back.callback(interaction))
+            picker = interaction.response.edit_message.await_args.kwargs["view"]
+            asyncio.run(picker.join_project(interaction, project_b))
+            second_start_view = interaction.response.edit_message.await_args.kwargs["view"]
+            asyncio.run(second_start_view.total.callback(interaction))
+
+        self.assertEqual(len(sprint.participants), 1)
+        self.assertEqual(
+            sprint.participants.get_user(interaction.user.id).project_id,
+            "b"
+        )
+
+    def test_no_project_start_view_hides_total_and_keeps_back(self):
+        sprint = self.create_sprint()
+        start_view = StartWordCountView(sprint, 111111111111111111, None)
+        labels = [item.label for item in start_view.children]
+
+        self.assertEqual(labels, ["Custom", "↩ Back"])
+
     def test_leave_still_responds_and_removes_participant(self):
         sprint = self.create_sprint()
         interaction = self.create_interaction()

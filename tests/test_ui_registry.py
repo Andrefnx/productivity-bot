@@ -5,7 +5,11 @@ from unittest.mock import patch
 from modules.common.entitlements import FEATURE_BOT_CUSTOMIZATION
 from modules.common.ui.registry import UIRegistry
 from modules.config.config_menu import ConfigMenuView
-from modules.help.help_messages import SETTINGS_DESCRIPTION
+from modules.help.help_messages import (
+    PROJECTS_DESCRIPTION,
+    SETTINGS_DESCRIPTION,
+    SPRINTS_DESCRIPTION
+)
 from modules.help.help_views import HelpSelect
 from modules.ui_registry import (
     get_help_registry,
@@ -98,6 +102,12 @@ class UIRegistryTests(unittest.TestCase):
         self.assertIn("Channel Settings", SETTINGS_DESCRIPTION)
         self.assertNotIn("Bot Appearance", SETTINGS_DESCRIPTION)
         self.assertNotIn("Marketplace", SETTINGS_DESCRIPTION)
+
+    def test_help_describes_current_sprint_and_project_flows(self):
+        self.assertIn("No Project", SPRINTS_DESCRIPTION)
+        self.assertIn("Custom", SPRINTS_DESCRIPTION)
+        self.assertIn("Total", SPRINTS_DESCRIPTION)
+        self.assertIn("Delete Project", PROJECTS_DESCRIPTION)
 
     def test_premium_entries_are_hidden_for_normal_guild_and_dm(self):
         registry = UIRegistry("test")
