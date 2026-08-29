@@ -206,6 +206,9 @@ class SprintActivityPickerView(ProjectPickerView):
             on_confirm=self.project_selected,
             show_last_project=show_last_project
         )
+
+    def refresh_components(self):
+        super().refresh_components()
         self.add_item(self.no_project)
 
         if self.back_callback is not None:
