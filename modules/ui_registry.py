@@ -1,28 +1,34 @@
+from importlib import import_module
+from pathlib import Path
+
 from modules.common.ui.registry import UIRegistry
+
+
+MODULES_ROOT = Path(__file__).resolve().parent
+
+
+def _iter_module_contributors(filename, register_name):
+    for path in sorted(MODULES_ROOT.rglob(filename)):
+        if "__pycache__" in path.parts:
+            continue
+
+        relative = path.relative_to(MODULES_ROOT).with_suffix("")
+        module_name = "modules." + ".".join(relative.parts)
+        module = import_module(module_name)
+        register = getattr(module, register_name, None)
+
+        if register is not None:
+            yield register
 
 
 def get_help_registry():
     registry = UIRegistry("help")
 
-    from modules.help.help_entries import register_help
-    from modules.sprints.help import register_help as register_sprint_help
-    from modules.user_profile.projects.help import (
-        register_help as register_project_help
-    )
-    from modules.user_profile.help import register_help as register_profile_help
-    from modules.config.help import register_help as register_config_help
-    from modules.bot_appearance.help import register_help as register_appearance_help
-    from modules.user_profile.imports.help import register_help as register_import_help
+    from modules.help.help_entries import register_help as register_general_help
 
-    for register in (
-        register_help,
-        register_sprint_help,
-        register_project_help,
-        register_profile_help,
-        register_config_help,
-        register_appearance_help,
-        register_import_help
-    ):
+    register_general_help(registry)
+
+    for register in _iter_module_contributors("help.py", "register_help"):
         register(registry)
 
     return registry
@@ -31,19 +37,7 @@ def get_help_registry():
 def get_settings_registry():
     registry = UIRegistry("settings")
 
-    from modules.config.user.settings import register_settings as register_user_settings
-    from modules.config.channel.settings import (
-        register_settings as register_channel_settings
-    )
-    from modules.bot_appearance.settings import (
-        register_settings as register_appearance_settings
-    )
-
-    for register in (
-        register_user_settings,
-        register_channel_settings,
-        register_appearance_settings
-    ):
+    for register in _iter_module_contributors("settings.py", "register_settings"):
         register(registry)
 
     return registry

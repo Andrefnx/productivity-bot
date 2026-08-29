@@ -54,12 +54,6 @@ from .sprint.sprint_config import (
     set_sprint_override
 )
 
-from .sprint.sprint_views import (
-    SprintConfigView,
-    SprintSettingsView,
-    create_sprint_settings_embed
-)
-
 
 __all__ = [
     "DEFAULT_CONFIG",
@@ -69,8 +63,6 @@ __all__ = [
     "ChannelConfigView",
     "DEFAULT_CHANNEL_CONFIG",
     "DEFAULT_SPRINT_CONFIG",
-    "SprintConfigView",
-    "SprintSettingsView",
     "can_edit_channel_config",
     "can_create_sprint",
     "can_edit_sprint_settings",
@@ -83,7 +75,6 @@ __all__ = [
     "get_user_config",
     "get_channel_config",
     "create_sprint_config",
-    "create_sprint_settings_embed",
     "create_channel_config_embed",
     "resolve_sprint_config",
     "resolve_empty_sprint_timeout",

@@ -5,16 +5,14 @@ from unittest.mock import patch
 from modules.common.entitlements import FEATURE_BOT_CUSTOMIZATION
 from modules.common.ui.registry import UIRegistry
 from modules.config.config_menu import ConfigMenuView
-from modules.help.help_messages import (
-    PROJECTS_DESCRIPTION,
-    SETTINGS_DESCRIPTION,
-    SPRINTS_DESCRIPTION
-)
+from modules.config.help import SETTINGS_DESCRIPTION
 from modules.help.help_views import HelpSelect
+from modules.sprints.help import SPRINTS_DESCRIPTION
 from modules.ui_registry import (
     get_help_registry,
     get_settings_registry
 )
+from modules.user_profile.projects.help import PROJECTS_DESCRIPTION
 
 
 class UIRegistryTests(unittest.TestCase):
@@ -73,6 +71,24 @@ class UIRegistryTests(unittest.TestCase):
 
         self.assertNotIn("marketplace", help_keys)
         self.assertNotIn("marketplace", settings_keys)
+
+    def test_module_help_is_discovered_without_central_registration(self):
+        help_keys = [entry.key for entry in get_help_registry().entries(111)]
+
+        self.assertIn("sprints", help_keys)
+        self.assertIn("projects", help_keys)
+        self.assertIn("profile", help_keys)
+        self.assertIn("settings", help_keys)
+        self.assertIn("imports", help_keys)
+
+    def test_module_settings_are_discovered_without_central_registration(self):
+        settings_keys = [
+            entry.key
+            for entry in get_settings_registry().entries(111)
+        ]
+
+        self.assertIn("user_settings", settings_keys)
+        self.assertIn("channel_settings", settings_keys)
 
     def test_global_menus_use_registry_entries(self):
         with patch.dict(
