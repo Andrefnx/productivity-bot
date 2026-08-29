@@ -20,7 +20,8 @@ def get_registered_results(
     return [
         sprint_user
         for sprint_user in participants.get_users()
-        if sprint_user.result_registered
+        if sprint_user.word_count_enabled
+        and sprint_user.result_registered
     ]
 
 
@@ -30,7 +31,8 @@ def get_pending_results(
     return [
         sprint_user
         for sprint_user in participants.get_users()
-        if not sprint_user.result_registered
+        if sprint_user.word_count_enabled
+        and not sprint_user.result_registered
     ]
 
 

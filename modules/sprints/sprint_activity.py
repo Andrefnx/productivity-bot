@@ -118,10 +118,20 @@ def skip_previous_activity(sprint_user: SprintUser):
 
 
 def create_activity_change_text(sprint_user):
+    current_activity = (
+        f"{sprint_user.initial_wc:,} words"
+        if sprint_user.word_count_enabled
+        else "No word count"
+    )
+    question = (
+        "Do you want to register progress before changing activity?"
+        if sprint_user.word_count_enabled
+        else "Choose a new activity."
+    )
     return (
         f"Current project: **{sprint_user.project}** "
-        f"✦ {sprint_user.initial_wc:,} words\n\n"
-        "Do you want to register progress before changing activity?"
+        f"✦ {current_activity}\n\n"
+        f"{question}"
     )
 
 
@@ -158,10 +168,15 @@ class ActivityProjectView(SprintActivityPickerView):
         )
 
         project_name = project.get("name") if project else "No project"
+        activity = (
+            f"{int(initial_wc):,} words"
+            if initial_wc is not None
+            else "No word count"
+        )
         await interaction.response.edit_message(
             content=(
-                f"Activity changed to **{project_name}** at "
-                f"**{initial_wc:,} words**."
+                f"Activity changed to **{project_name}** "
+                f"with **{activity}**."
             ),
             embed=None,
             view=None
@@ -180,6 +195,9 @@ class ActivityChangeView(discord.ui.View):
         super().__init__(timeout=60)
         self.sprint_view = sprint_view
         self.sprint_user = sprint_user
+
+        if not sprint_user.word_count_enabled:
+            self.remove_item(self.register_progress)
 
     async def interaction_check(self, interaction: discord.Interaction):
         if interaction.user.id != self.sprint_user.user_id:
@@ -364,6 +382,13 @@ class SprintResultsView(discord.ui.View):
             )
             return
 
+        if not sprint_user.word_count_enabled:
+            await interaction.response.send_message(
+                "You joined this activity without word count tracking.",
+                ephemeral=True
+            )
+            return
+
         if sprint_user.result_registered:
             await interaction.response.send_message(
                 "You already registered your word count.",
@@ -407,9 +432,15 @@ async def start_results_registration(
     participants,
     registration_seconds=600
 ):
-    mentions = participants.get_ping_text()
-    if not mentions:
-        return
+    tracked_users = [
+        sprint_user
+        for sprint_user in participants.get_users()
+        if sprint_user.word_count_enabled
+    ]
+    mentions = " ".join(
+        sprint_user.mention
+        for sprint_user in tracked_users
+    )
 
     deadline_timestamp = int(time.time() + registration_seconds)
     results_view = SprintResultsView(
@@ -425,7 +456,7 @@ async def start_results_registration(
     )
 
     results_message = await channel.send(
-        content=mentions,
+        content=mentions or None,
         embed=finished_embed,
         view=results_view,
         allowed_mentions=discord.AllowedMentions(
@@ -436,10 +467,15 @@ async def start_results_registration(
     )
 
     results_view.message = results_message
+    results_view.sprint_duration = duration
+
+    if not tracked_users:
+        await results_view.finish_if_complete()
+        return
+
     results_view.reminder_task = asyncio.create_task(
         send_result_reminder(results_view)
     )
     results_view.close_task = asyncio.create_task(
         close_results_registration(results_view)
     )
-    results_view.sprint_duration = duration
