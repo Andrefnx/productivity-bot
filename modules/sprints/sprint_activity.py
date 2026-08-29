@@ -11,8 +11,9 @@ if TYPE_CHECKING:
 import discord
 
 from modules.common.ui import WordCountChangeModal
-
 from modules.economy import award_sprint_result
+from modules.user_profile.projects import add_project_words
+from modules.user_profile.profile_storage import add_words_outside_projects
 
 from .sprint_results import (
     close_results_registration,
@@ -20,85 +21,44 @@ from .sprint_results import (
     get_sorted_results,
     send_result_reminder
 )
-
-from modules.user_profile.projects import (
-    ProjectPickerView,
-    add_project_words
-)
-from modules.user_profile.profile_storage import add_words_outside_projects
-
 from .system_messages import (
     create_finished_embed,
     create_results_embed
 )
+from .users import SprintActivityPickerView
+
 
 # -------------------------------------------------------
 #                 WORD COUNT CALCULATIONS
 # -------------------------------------------------------
 
-def calculate_new_total(
-    initial_wc: int,
-    new_total: int
-):
-    return (
-        new_total
-        - initial_wc
-    )
+def calculate_new_total(initial_wc: int, new_total: int):
+    return new_total - initial_wc
 
 
-def calculate_difference_total(
-    initial_wc: int,
-    difference: int
-):
-    return (
-        initial_wc
-        + difference
-    )
+def calculate_difference_total(initial_wc: int, difference: int):
+    return initial_wc + difference
 
 
-def register_new_total(
-    sprint_user: SprintUser,
-    new_total: int
-):
+def register_new_total(sprint_user: SprintUser, new_total: int):
     current_words = calculate_new_total(
         sprint_user.initial_wc,
         new_total
     )
-
-    sprint_user.final_wc = (
-        new_total
-    )
-
-    sprint_user.words_written = (
-        sprint_user.accumulated_words
-        + current_words
-    )
-
+    sprint_user.final_wc = new_total
+    sprint_user.words_written = sprint_user.accumulated_words + current_words
     sprint_user.result_registered = True
-
     apply_positive_progress(sprint_user, current_words)
 
 
-def register_difference(
-    sprint_user: SprintUser,
-    difference: int
-):
-    final_wc = (
-        calculate_difference_total(
-            sprint_user.initial_wc,
-            difference
-        )
+def register_difference(sprint_user: SprintUser, difference: int):
+    final_wc = calculate_difference_total(
+        sprint_user.initial_wc,
+        difference
     )
-
     sprint_user.final_wc = final_wc
-
-    sprint_user.words_written = (
-        sprint_user.accumulated_words
-        + difference
-    )
-
+    sprint_user.words_written = sprint_user.accumulated_words + difference
     sprint_user.result_registered = True
-
     apply_positive_progress(sprint_user, difference)
 
 
@@ -125,17 +85,11 @@ def apply_positive_progress(sprint_user, progress):
 #                  ACTIVITY HISTORY
 # -------------------------------------------------------
 
-def register_previous_total(
-    sprint_user: SprintUser,
-    new_total: int
-):
-    difference = (
-        calculate_new_total(
-            sprint_user.initial_wc,
-            new_total
-        )
+def register_previous_total(sprint_user: SprintUser, new_total: int):
+    difference = calculate_new_total(
+        sprint_user.initial_wc,
+        new_total
     )
-
     sprint_user.archive_activity(
         final_wc=new_total,
         words_written=difference,
@@ -143,17 +97,11 @@ def register_previous_total(
     )
 
 
-def register_previous_difference(
-    sprint_user: SprintUser,
-    difference: int
-):
-    final_wc = (
-        calculate_difference_total(
-            sprint_user.initial_wc,
-            difference
-        )
+def register_previous_difference(sprint_user: SprintUser, difference: int):
+    final_wc = calculate_difference_total(
+        sprint_user.initial_wc,
+        difference
     )
-
     sprint_user.archive_activity(
         final_wc=final_wc,
         words_written=difference,
@@ -161,9 +109,7 @@ def register_previous_difference(
     )
 
 
-def skip_previous_activity(
-    sprint_user: SprintUser
-):
+def skip_previous_activity(sprint_user: SprintUser):
     sprint_user.archive_activity(
         final_wc=None,
         words_written=None,
@@ -183,69 +129,45 @@ def create_activity_change_text(sprint_user):
 #                 PROJECT SWITCH VIEW
 # -------------------------------------------------------
 
-class ActivityProjectBackButton(discord.ui.Button):
-    def __init__(self, activity_view):
-        self.activity_view = activity_view
-        super().__init__(
-            label="↩ Back",
-            style=discord.ButtonStyle.secondary,
-            row=4
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.edit_message(
-            content=create_activity_change_text(
-                self.activity_view.sprint_user
-            ),
-            embed=None,
-            view=ActivityChangeView(
-                sprint_view=self.activity_view.sprint_view,
-                sprint_user=self.activity_view.sprint_user
-            )
-        )
-
-
-class ActivityProjectView(
-    ProjectPickerView
-):
-    def __init__(
-        self,
-        sprint_view,
-        sprint_user
-    ):
+class ActivityProjectView(SprintActivityPickerView):
+    def __init__(self, sprint_view, sprint_user):
         self.sprint_view = sprint_view
         self.sprint_user = sprint_user
 
         super().__init__(
             owner_id=sprint_user.user_id,
-            on_confirm=self.switch_project
+            on_activity_confirm=self.switch_activity,
+            back_callback=self.back_to_activity,
+            show_last_project=True
         )
 
-    def refresh_components(self):
-        super().refresh_components()
-        self.add_item(ActivityProjectBackButton(self))
+    async def back_to_activity(self, interaction):
+        await interaction.response.edit_message(
+            content=create_activity_change_text(self.sprint_user),
+            embed=None,
+            view=ActivityChangeView(
+                sprint_view=self.sprint_view,
+                sprint_user=self.sprint_user
+            )
+        )
 
-    async def switch_project(
-        self,
-        interaction,
-        project
-    ):
+    async def switch_activity(self, interaction, project, initial_wc):
         self.sprint_user.switch_project(
-            project
+            project,
+            initial_wc=initial_wc
         )
 
+        project_name = project.get("name") if project else "No project"
         await interaction.response.edit_message(
             content=(
-                f"Activity changed to "
-                f"**{project['name']}** at "
-                f"**{project['wordcount']:,} words**."
+                f"Activity changed to **{project_name}** at "
+                f"**{initial_wc:,} words**."
             ),
             embed=None,
             view=None
         )
 
         await self.sprint_view.update_current_message()
-
         self.stop()
 
 
@@ -253,47 +175,26 @@ class ActivityProjectView(
 #                 ACTIVITY CHANGE VIEW
 # -------------------------------------------------------
 
-class ActivityChangeView(
-    discord.ui.View
-):
-    def __init__(
-        self,
-        sprint_view,
-        sprint_user: SprintUser
-    ):
-        super().__init__(
-            timeout=60
-        )
-
+class ActivityChangeView(discord.ui.View):
+    def __init__(self, sprint_view, sprint_user: SprintUser):
+        super().__init__(timeout=60)
         self.sprint_view = sprint_view
         self.sprint_user = sprint_user
 
-    async def interaction_check(
-        self,
-        interaction: discord.Interaction
-    ):
-        if (
-            interaction.user.id
-            != self.sprint_user.user_id
-        ):
+    async def interaction_check(self, interaction: discord.Interaction):
+        if interaction.user.id != self.sprint_user.user_id:
             await interaction.response.send_message(
                 "This activity menu belongs to another user.",
                 ephemeral=True
             )
-
             return False
-
         return True
 
-    async def open_project_picker(
-        self,
-        interaction
-    ):
+    async def open_project_picker(self, interaction):
         view = ActivityProjectView(
             sprint_view=self.sprint_view,
             sprint_user=self.sprint_user
         )
-
         await interaction.response.edit_message(
             content="Choose your next project:",
             embed=None,
@@ -315,16 +216,9 @@ class ActivityChangeView(
             on_validated=self.register_progress_result,
             title="Register Current Progress"
         )
+        await interaction.response.send_modal(modal)
 
-        await interaction.response.send_modal(
-            modal
-        )
-
-    async def register_progress_result(
-        self,
-        interaction,
-        result
-    ):
+    async def register_progress_result(self, interaction, result):
         if result.mode == "total":
             register_previous_total(
                 self.sprint_user,
@@ -340,7 +234,6 @@ class ActivityChangeView(
             sprint_view=self.sprint_view,
             sprint_user=self.sprint_user
         )
-
         await interaction.response.edit_message(
             content="Progress saved. Choose your next project:",
             embed=None,
@@ -357,15 +250,11 @@ class ActivityChangeView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
-        skip_previous_activity(
-            self.sprint_user
-        )
-
+        skip_previous_activity(self.sprint_user)
         view = ActivityProjectView(
             sprint_view=self.sprint_view,
             sprint_user=self.sprint_user
         )
-
         await interaction.response.edit_message(
             content="Choose your next project:",
             embed=None,
@@ -391,97 +280,60 @@ class ActivityChangeView(
 
 
 # -------------------------------------------------------
-#               PREVIOUS ACTIVITY MODAL
-# -------------------------------------------------------
-
-# -------------------------------------------------------
-#                WORD COUNT MODAL
-# -------------------------------------------------------
-
-# -------------------------------------------------------
 #                   RESULTS VIEW
 # -------------------------------------------------------
 
-class SprintResultsView(
-    discord.ui.View
-):
+class SprintResultsView(discord.ui.View):
     def __init__(
         self,
         participants,
         deadline_timestamp,
         registration_seconds=600
     ):
-        super().__init__(
-            timeout=None
-        )
-
+        super().__init__(timeout=None)
         self.participants = participants
         self.deadline_timestamp = deadline_timestamp
         self.registration_seconds = registration_seconds
         self.sprint_duration = 0
-
         self.message = None
-
         self.closed = False
         self.results_sent = False
-
         self.reminder_task = None
         self.close_task = None
 
-    async def send_final_results(
-        self
-    ):
+    async def send_final_results(self):
         if self.results_sent:
             return
-
         final_embed = create_results_embed(
-            get_sorted_results(
-                self.participants
-            )
+            get_sorted_results(self.participants)
         )
-
-        await self.message.channel.send(
-            embed=final_embed
-        )
-
+        await self.message.channel.send(embed=final_embed)
         self.results_sent = True
 
-    async def close_registration_message(
-        self
-    ):
+    async def close_registration_message(self):
         if self.message is None:
             return
-
         await self.message.edit(
             content="Word count registration closed.",
             view=None
         )
 
-    async def finish_if_complete(
-        self
-    ):
+    async def finish_if_complete(self):
         if self.closed:
             return
-
-        if get_pending_results(
-            self.participants
-        ):
+        if get_pending_results(self.participants):
             return
 
         self.closed = True
-
         await self.award_rewards()
 
         if self.reminder_task is not None:
             self.reminder_task.cancel()
-
         if self.close_task is not None:
             self.close_task.cancel()
 
         await self.close_registration_message()
-
         await self.send_final_results()
-
         self.stop()
 
     async def award_rewards(self):
@@ -496,31 +348,20 @@ class SprintResultsView(
         label="Register Word Count",
         style=discord.ButtonStyle.primary
     )
-    async def register_word_count(
-        self,
-        interaction,
-        button
-    ):
+    async def register_word_count(self, interaction, button):
         if self.closed:
             await interaction.response.send_message(
                 "Word count registration is closed.",
                 ephemeral=True
             )
-
             return
 
-        sprint_user = (
-            self.participants.get_user(
-                interaction.user.id
-            )
-        )
-
+        sprint_user = self.participants.get_user(interaction.user.id)
         if sprint_user is None:
             await interaction.response.send_message(
                 "You were not in the sprint when it finished.",
                 ephemeral=True
             )
-
             return
 
         if sprint_user.result_registered:
@@ -528,7 +369,6 @@ class SprintResultsView(
                 "You already registered your word count.",
                 ephemeral=True
             )
-
             return
 
         await interaction.response.send_modal(
@@ -538,23 +378,15 @@ class SprintResultsView(
             )
         )
 
-    async def register_word_count_result(
-        self,
-        interaction,
-        result
-    ):
+    async def register_word_count_result(self, interaction, result):
         if result.mode == "total":
             register_new_total(
-                self.participants.get_user(
-                    interaction.user.id
-                ),
+                self.participants.get_user(interaction.user.id),
                 result.new_total
             )
         else:
             register_difference(
-                self.participants.get_user(
-                    interaction.user.id
-                ),
+                self.participants.get_user(interaction.user.id),
                 result.difference
             )
 
@@ -562,7 +394,6 @@ class SprintResultsView(
             "Word count registered.",
             ephemeral=True
         )
-
         await self.finish_if_complete()
 
 
@@ -576,18 +407,11 @@ async def start_results_registration(
     participants,
     registration_seconds=600
 ):
-    mentions = (
-        participants.get_ping_text()
-    )
-
+    mentions = participants.get_ping_text()
     if not mentions:
         return
 
-    deadline_timestamp = int(
-        time.time()
-        + registration_seconds
-    )
-
+    deadline_timestamp = int(time.time() + registration_seconds)
     results_view = SprintResultsView(
         participants=participants,
         deadline_timestamp=deadline_timestamp,
@@ -596,9 +420,7 @@ async def start_results_registration(
 
     finished_embed = create_finished_embed(
         duration=duration,
-        participants_text=(
-            participants.get_mentions_text()
-        ),
+        participants_text=participants.get_mentions_text(),
         deadline_timestamp=deadline_timestamp
     )
 
@@ -613,23 +435,11 @@ async def start_results_registration(
         )
     )
 
-    results_view.message = (
-        results_message
+    results_view.message = results_message
+    results_view.reminder_task = asyncio.create_task(
+        send_result_reminder(results_view)
     )
-
-    results_view.reminder_task = (
-        asyncio.create_task(
-            send_result_reminder(
-                results_view
-            )
-        )
-    )
-
-    results_view.close_task = (
-        asyncio.create_task(
-            close_results_registration(
-                results_view
-            )
-        )
+    results_view.close_task = asyncio.create_task(
+        close_results_registration(results_view)
     )
     results_view.sprint_duration = duration
