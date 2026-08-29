@@ -111,6 +111,57 @@ class ConfirmationView(
 #                    SPRINT VIEW
 # -------------------------------------------------------
 
+class SprintSettingsMenuView(
+    discord.ui.View
+):
+    def __init__(self, sprint_view):
+        super().__init__(timeout=120)
+        self.sprint_view = sprint_view
+
+    async def interaction_check(self, interaction):
+        if not can_manage_sprint_action(
+            interaction.user,
+            self.sprint_view.creator_id,
+            "creator_or_moderator"
+        ):
+            await interaction.response.send_message(
+                "Only the sprint creator or moderators can edit these settings.",
+                ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(
+        label="Change Sprint Time",
+        style=discord.ButtonStyle.secondary,
+        row=0
+    )
+    async def change_time(self, interaction, button):
+        await self.sprint_view.open_change_sprint_time(interaction)
+
+    @discord.ui.button(
+        label="Edit Sprint Settings",
+        style=discord.ButtonStyle.secondary,
+        row=0
+    )
+    async def edit_settings(self, interaction, button):
+        await interaction.response.edit_message(
+            embed=create_sprint_settings_embed(self.sprint_view),
+            view=SprintSettingsView(self.sprint_view)
+        )
+
+    @discord.ui.button(
+        label="↩ Back",
+        style=discord.ButtonStyle.secondary,
+        row=1
+    )
+    async def back(self, interaction, button):
+        await interaction.response.edit_message(
+            content="Sprint settings closed.",
+            embed=None,
+            view=None
+        )
+
 class SprintView(
     discord.ui.View
 ):
@@ -752,7 +803,7 @@ class SprintView(
     @discord.ui.button(
         label="Cancel Sprint",
         style=discord.ButtonStyle.danger,
-        row=0
+        row=3
     )
     async def cancel_sprint(
         self,
@@ -787,18 +838,9 @@ class SprintView(
 
 
 # -------------------------------------------------------
-#                CHANGE SPRINT TIME
-# -------------------------------------------------------
-
-    @discord.ui.button(
-        label="Change Sprint Time",
-        style=discord.ButtonStyle.secondary,
-        row=1
-    )
-    async def change_sprint_time(
+    async def open_change_sprint_time(
         self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
+        interaction: discord.Interaction
     ):
         if self.finished:
             await interaction.response.send_message(
@@ -840,7 +882,7 @@ class SprintView(
     @discord.ui.button(
         label="Sprint Settings",
         style=discord.ButtonStyle.secondary,
-        row=1
+        row=2
     )
     async def sprint_settings(
         self,
@@ -859,12 +901,11 @@ class SprintView(
             return
 
         await interaction.response.send_message(
-            embed=create_sprint_settings_embed(
-                self
+            embed=discord.Embed(
+                title="Sprint Settings",
+                description="Choose an action."
             ),
-            view=SprintSettingsView(
-                self
-            ),
+            view=SprintSettingsMenuView(self),
             ephemeral=True
         )
 
@@ -874,7 +915,7 @@ class SprintView(
 # -------------------------------------------------------
 
     @discord.ui.button(
-        label="Edit Sprint Activity",
+        label="Sprint Activity",
         style=discord.ButtonStyle.secondary,
         row=1
     )
