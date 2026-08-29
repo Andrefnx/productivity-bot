@@ -34,7 +34,8 @@ class SprintUser:
         self.session_id = str(uuid.uuid4())
         self.project_id = project.get("project_id") if project else None
         self.project = project.get("name", "Untitled") if project else "No project"
-        self.initial_wc = initial_wc
+        self.word_count_enabled = initial_wc is not None
+        self.initial_wc = int(initial_wc or 0)
         self.final_wc = None
         self.words_written = None
         self.accumulated_words = 0
@@ -64,10 +65,11 @@ class SprintUser:
             {
                 "project_id": self.project_id,
                 "project": self.project,
-                "initial_wc": self.initial_wc,
+                "initial_wc": self.initial_wc if self.word_count_enabled else None,
                 "final_wc": final_wc,
                 "words_written": words_written,
-                "registered": registered
+                "registered": registered,
+                "word_count_enabled": self.word_count_enabled
             }
         )
 
@@ -85,14 +87,11 @@ class SprintUser:
                 words=max(words_written or 0, 0)
             )
 
-    def switch_project(self, project, initial_wc=None):
+    def switch_project(self, project, initial_wc=0):
         self.project_id = project.get("project_id") if project else None
         self.project = project.get("name", "Untitled") if project else "No project"
-
-        if initial_wc is None:
-            initial_wc = int(project.get("wordcount", 0)) if project else 0
-
-        self.initial_wc = initial_wc
+        self.word_count_enabled = initial_wc is not None
+        self.initial_wc = int(initial_wc or 0)
         self.final_wc = None
         self.words_written = None
         self.result_registered = False
@@ -101,9 +100,14 @@ class SprintUser:
             self.set_last_project()
 
     def get_participant_text(self):
+        if self.word_count_enabled:
+            activity = f"{self.initial_wc:,} words"
+        else:
+            activity = "No word count"
+
         return (
             f"{self.mention} ✦ "
-            f"{self.initial_wc:,} words ✦ "
+            f"{activity} ✦ "
             f"**{self.project}**"
         )
 
@@ -175,14 +179,18 @@ class SprintParticipants:
 # -------------------------------------------------------
 
 def create_start_word_count_embed(project):
-    if project is None:
-        description = "Choose **Custom** to start from 0 or another value."
-    else:
-        description = (
-            f"**{project['name']}**\n"
-            "Choose **Total** to use the project total, or "
-            "**Custom** to start from 0 or another value."
+    project_name = project.get("name") if project else "No project"
+    description = (
+        f"**{project_name}**\n"
+        "Choose **Total** to use the project total, **Custom** to start "
+        "from 0 or another value, or **No Word Count** to participate "
+        "without tracking words."
+        if project is not None
+        else (
+            "Choose **Custom** to start from 0 or another value, or "
+            "**No Word Count** to participate without tracking words."
         )
+    )
 
     return discord.Embed(
         title="Starting Word Count",
@@ -329,20 +337,30 @@ class StartWordCountView(discord.ui.View):
 
     @discord.ui.button(
         label="Custom",
-        style=discord.ButtonStyle.secondary
+        style=discord.ButtonStyle.secondary,
+        row=0
     )
     async def custom(self, interaction, button):
         await interaction.response.send_modal(StartWordCountModal(self))
 
     @discord.ui.button(
         label="Total",
-        style=discord.ButtonStyle.secondary
+        style=discord.ButtonStyle.secondary,
+        row=0
     )
     async def total(self, interaction, button):
         await self.confirm_activity(
             interaction,
             int(self.project.get("wordcount", 0))
         )
+
+    @discord.ui.button(
+        label="No Word Count",
+        style=discord.ButtonStyle.secondary,
+        row=0
+    )
+    async def no_word_count(self, interaction, button):
+        await self.confirm_activity(interaction, None)
 
     @discord.ui.button(
         label="↩ Back",
@@ -401,11 +419,16 @@ class JoinSprintView(SprintActivityPickerView):
         self.sprint_view.participant_joined()
 
         project_name = project.get("name") if project else "No project"
+        activity = (
+            f"{int(initial_wc):,} words"
+            if initial_wc is not None
+            else "No word count"
+        )
         await interaction.response.edit_message(
             content=None,
             embed=discord.Embed(
                 title="Joined sprint",
-                description=f"**{project_name}** ✦ {initial_wc:,} words"
+                description=f"**{project_name}** ✦ {activity}"
             ),
             view=None
         )
