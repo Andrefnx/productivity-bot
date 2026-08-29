@@ -171,9 +171,39 @@ def skip_previous_activity(
     )
 
 
+def create_activity_change_text(sprint_user):
+    return (
+        f"Current project: **{sprint_user.project}** "
+        f"✦ {sprint_user.initial_wc:,} words\n\n"
+        "Do you want to register progress before changing activity?"
+    )
+
+
 # -------------------------------------------------------
 #                 PROJECT SWITCH VIEW
 # -------------------------------------------------------
+
+class ActivityProjectBackButton(discord.ui.Button):
+    def __init__(self, activity_view):
+        self.activity_view = activity_view
+        super().__init__(
+            label="↩ Back",
+            style=discord.ButtonStyle.secondary,
+            row=4
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.edit_message(
+            content=create_activity_change_text(
+                self.activity_view.sprint_user
+            ),
+            embed=None,
+            view=ActivityChangeView(
+                sprint_view=self.activity_view.sprint_view,
+                sprint_user=self.activity_view.sprint_user
+            )
+        )
+
 
 class ActivityProjectView(
     ProjectPickerView
@@ -191,6 +221,10 @@ class ActivityProjectView(
             on_confirm=self.switch_project
         )
 
+    def refresh_components(self):
+        super().refresh_components()
+        self.add_item(ActivityProjectBackButton(self))
+
     async def switch_project(
         self,
         interaction,
@@ -200,13 +234,14 @@ class ActivityProjectView(
             project
         )
 
-        await interaction.response.send_message(
-            (
+        await interaction.response.edit_message(
+            content=(
                 f"Activity changed to "
                 f"**{project['name']}** at "
                 f"**{project['wordcount']:,} words**."
             ),
-            ephemeral=True
+            embed=None,
+            view=None
         )
 
         await self.sprint_view.update_current_message()
@@ -259,15 +294,16 @@ class ActivityChangeView(
             sprint_user=self.sprint_user
         )
 
-        await interaction.response.send_message(
-            "Choose your next project:",
-            view=view,
-            ephemeral=True
+        await interaction.response.edit_message(
+            content="Choose your next project:",
+            embed=None,
+            view=view
         )
 
     @discord.ui.button(
         label="Register Progress",
-        style=discord.ButtonStyle.primary
+        style=discord.ButtonStyle.primary,
+        row=0
     )
     async def register_progress(
         self,
@@ -305,15 +341,16 @@ class ActivityChangeView(
             sprint_user=self.sprint_user
         )
 
-        await interaction.response.send_message(
-            "Progress saved. Choose your next project:",
-            view=view,
-            ephemeral=True
+        await interaction.response.edit_message(
+            content="Progress saved. Choose your next project:",
+            embed=None,
+            view=view
         )
 
     @discord.ui.button(
         label="Skip & Change",
-        style=discord.ButtonStyle.secondary
+        style=discord.ButtonStyle.secondary,
+        row=0
     )
     async def skip_progress(
         self,
@@ -329,11 +366,28 @@ class ActivityChangeView(
             sprint_user=self.sprint_user
         )
 
-        await interaction.response.send_message(
-            "Choose your next project:",
-            view=view,
-            ephemeral=True
+        await interaction.response.edit_message(
+            content="Choose your next project:",
+            embed=None,
+            view=view
         )
+
+    @discord.ui.button(
+        label="↩ Back",
+        style=discord.ButtonStyle.secondary,
+        row=1
+    )
+    async def back(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await interaction.response.edit_message(
+            content="Back to sprint.",
+            embed=None,
+            view=None
+        )
+        self.stop()
 
 
 # -------------------------------------------------------
