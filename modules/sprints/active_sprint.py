@@ -114,6 +114,8 @@ class ConfirmationView(
 class SprintView(
     discord.ui.View
 ):
+    EMPTY_ACTIVE_SPRINT_GRACE_SECONDS = 300
+
     def __init__(
         self,
         duration: int,
@@ -151,6 +153,7 @@ class SprintView(
 
         self.message = None
         self.sprint_timer = None
+        self.empty_sprint_timer = None
 
         self.participants = SprintParticipants(
             sprint_id=self.sprint_id
@@ -329,7 +332,54 @@ class SprintView(
 
         await self.update_started_message()
 
+        self.schedule_empty_sprint_timeout()
+
         await self.send_start_notification()
+
+    def cancel_empty_sprint_timeout(self):
+        if self.empty_sprint_timer is not None:
+            try:
+                current_task = asyncio.current_task()
+            except RuntimeError:
+                current_task = None
+
+            if self.empty_sprint_timer is not current_task:
+                self.empty_sprint_timer.cancel()
+            self.empty_sprint_timer = None
+
+    def schedule_empty_sprint_timeout(self):
+        if (
+            not self.started
+            or self.finished
+            or len(self.participants) != 0
+            or self.empty_sprint_timer is not None
+        ):
+            return
+
+        self.empty_sprint_timer = asyncio.create_task(
+            self.wait_for_empty_sprint_timeout()
+        )
+
+    async def wait_for_empty_sprint_timeout(self):
+        try:
+            await asyncio.sleep(self.EMPTY_ACTIVE_SPRINT_GRACE_SECONDS)
+
+            if (
+                self.started
+                and not self.finished
+                and len(self.participants) == 0
+            ):
+                await self.close_empty_sprint()
+        except asyncio.CancelledError:
+            return
+        finally:
+            self.empty_sprint_timer = None
+
+    def participant_joined(self):
+        self.cancel_empty_sprint_timeout()
+
+    def participant_left(self):
+        self.schedule_empty_sprint_timeout()
 
 
 # -------------------------------------------------------
@@ -373,50 +423,7 @@ class SprintView(
                 self.duration * 60
             )
 
-            if len(
-                self.participants
-            ) == 0:
-                if self.channel_config["cancel_empty_sprints"]:
-                    empty_timeout = min(
-                        duration_seconds,
-                        resolve_empty_sprint_timeout(
-                            self.channel_config,
-                            self.sprint_config
-                        )
-                    )
-
-                    await asyncio.sleep(
-                        empty_timeout
-                    )
-
-                    if self.finished:
-                        return
-
-                    if len(
-                        self.participants
-                    ) == 0:
-                        await self.close_empty_sprint()
-
-                        return
-
-                    remaining_seconds = (
-                        duration_seconds
-                        - empty_timeout
-                    )
-
-                    if remaining_seconds > 0:
-                        await asyncio.sleep(
-                            remaining_seconds
-                        )
-                else:
-                    await asyncio.sleep(
-                        duration_seconds
-                    )
-
-            else:
-                await asyncio.sleep(
-                    duration_seconds
-                )
+            await asyncio.sleep(duration_seconds)
 
             if self.finished:
                 return
@@ -445,6 +452,7 @@ class SprintView(
             return
 
         self.finished = True
+        self.cancel_empty_sprint_timeout()
 
         finished_participants = (
             self.participants.snapshot()
@@ -488,6 +496,7 @@ class SprintView(
             return
 
         self.finished = True
+        self.cancel_empty_sprint_timeout()
 
         empty_embed = create_empty_sprint_embed()
 
@@ -588,6 +597,8 @@ class SprintView(
 
         if self.sprint_timer is not None:
             self.sprint_timer.cancel()
+
+        self.cancel_empty_sprint_timeout()
 
         self.finished = True
 
@@ -723,6 +734,8 @@ class SprintView(
             )
 
             return
+
+        self.participant_left()
 
         await interaction.response.send_message(
             left_message,

@@ -427,6 +427,8 @@ class StartWordCountView(discord.ui.View):
 
             return
 
+        self.sprint_view.participant_joined()
+
         project_name = self.project.get("name") if self.project else "No project"
         await interaction.response.edit_message(
             content=None,
