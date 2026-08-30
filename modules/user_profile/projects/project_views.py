@@ -1,5 +1,7 @@
 import discord
 
+from modules.common.ui import create_browser_state_embed
+
 from .project_list import (
     PROJECT_STATUSES,
     create_project_embed,
@@ -20,6 +22,31 @@ from .project_modals import (
     CreateProjectModal,
     EditProjectModal
 )
+
+
+def create_project_browser_state_embed(
+    sort_mode,
+    status_filter,
+    page,
+    total_pages
+):
+    sort_labels = {
+        "alphabetical": "Alphabetical",
+        "status": "Status",
+        "newest": "Newest",
+        "oldest": "Oldest"
+    }
+    filter_label = (
+        "All statuses"
+        if status_filter == "all"
+        else status_filter
+    )
+    return create_browser_state_embed(
+        sort_labels.get(sort_mode, "Alphabetical"),
+        filter_label,
+        page,
+        total_pages
+    )
 
 
 # -------------------------------------------------------
@@ -514,10 +541,10 @@ class ProjectPickerView(
             is None
         )
 
-    def create_current_embed(
+    def create_current_embeds(
         self
     ):
-        return create_projects_embed(
+        content_embed = create_projects_embed(
             user=type(
                 "ProjectOwner",
                 (),
@@ -532,6 +559,20 @@ class ProjectPickerView(
             page=self.page,
             total_pages=self.total_pages
         )
+        return [
+            content_embed,
+            create_project_browser_state_embed(
+                self.sort_mode,
+                self.status_filter,
+                self.page,
+                self.total_pages
+            )
+        ]
+
+    def create_current_embed(
+        self
+    ):
+        return self.create_current_embeds()[0]
 
     async def interaction_check(
         self,
@@ -576,7 +617,7 @@ class ProjectPickerView(
 
         await interaction.response.edit_message(
             content=None,
-            embed=self.create_current_embed(),
+            embeds=self.create_current_embeds(),
             view=self
         )
 
@@ -588,7 +629,7 @@ class ProjectPickerView(
 
         await interaction.response.edit_message(
             content=None,
-            embed=self.create_current_embed(),
+            embeds=self.create_current_embeds(),
             view=self
         )
 
@@ -688,7 +729,7 @@ class ProjectPickerView(
 
             await back_interaction.response.edit_message(
                 content=None,
-                embed=view.create_current_embed(),
+                embeds=view.create_current_embeds(),
                 view=view
             )
 
@@ -760,7 +801,10 @@ class ProjectDetailView(
     def __init__(
         self,
         owner,
-        project_id: str
+        project_id: str,
+        sort_mode="alphabetical",
+        status_filter="all",
+        page=0
     ):
         super().__init__(
             timeout=180
@@ -768,6 +812,9 @@ class ProjectDetailView(
 
         self.owner = owner
         self.project_id = project_id
+        self.sort_mode = sort_mode
+        self.status_filter = status_filter
+        self.page = page
 
         project = get_project(
             owner.id,
@@ -885,11 +932,14 @@ class ProjectDetailView(
         button: discord.ui.Button
     ):
         view = UserProjectsView(
-            owner=self.owner
+            owner=self.owner,
+            sort_mode=self.sort_mode,
+            status_filter=self.status_filter,
+            page=self.page
         )
 
         await interaction.response.edit_message(
-            embed=view.create_current_embed(),
+            embeds=view.create_current_embeds(),
             view=view
         )
 
@@ -1052,10 +1102,10 @@ class UserProjectsView(
             self.back_profile
         )
 
-    def create_current_embed(
+    def create_current_embeds(
         self
     ):
-        return create_projects_embed(
+        content_embed = create_projects_embed(
             user=self.owner,
             projects=self.page_projects,
             sort_mode=self.sort_mode,
@@ -1063,6 +1113,20 @@ class UserProjectsView(
             page=self.page,
             total_pages=self.total_pages
         )
+        return [
+            content_embed,
+            create_project_browser_state_embed(
+                self.sort_mode,
+                self.status_filter,
+                self.page,
+                self.total_pages
+            )
+        ]
+
+    def create_current_embed(
+        self
+    ):
+        return self.create_current_embeds()[0]
 
     async def interaction_check(
         self,
@@ -1088,7 +1152,7 @@ class UserProjectsView(
         self.build_components()
 
         await interaction.response.edit_message(
-            embed=self.create_current_embed(),
+            embeds=self.create_current_embeds(),
             view=self
         )
 
@@ -1140,7 +1204,10 @@ class UserProjectsView(
             ),
             view=ProjectDetailView(
                 owner=self.owner,
-                project_id=project_id
+                project_id=project_id,
+                sort_mode=self.sort_mode,
+                status_filter=self.status_filter,
+                page=self.page
             )
         )
 
@@ -1213,7 +1280,7 @@ class UserProjectsView(
             )
 
             await back_interaction.response.edit_message(
-                embed=view.create_current_embed(),
+                embeds=view.create_current_embeds(),
                 view=view
             )
 
@@ -1307,7 +1374,7 @@ class DeleteProjectConfirmationView(
 
         await interaction.response.edit_message(
             content=None,
-            embed=view.create_current_embed(),
+            embeds=view.create_current_embeds(),
             view=view
         )
         self.stop()

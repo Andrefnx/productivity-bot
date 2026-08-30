@@ -174,13 +174,11 @@ class ProfileView(
             owner=self.owner
         )
 
-        projects_embed = (
-            projects_view.create_current_embed()
-        )
+        projects_embeds = projects_view.create_current_embeds()
 
         if projects_private:
             await interaction.response.send_message(
-                embed=projects_embed,
+                embeds=projects_embeds,
                 view=projects_view,
                 ephemeral=True
             )
@@ -200,7 +198,7 @@ class ProfileView(
             pass
 
         await interaction.followup.send(
-            embed=projects_embed,
+            embeds=projects_embeds,
             view=projects_view,
             ephemeral=False
         )

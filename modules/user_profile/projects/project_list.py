@@ -702,35 +702,14 @@ def create_projects_embed(
             user.id
         )
 
-    sort_labels = {
-        "alphabetical": "Alphabetical",
-        "status": "Status",
-        "newest": "Newest",
-        "oldest": "Oldest"
-    }
-
-    filter_label = (
-        "All statuses"
-        if status_filter == "all"
-        else status_filter
-    )
-
     embed = discord.Embed(
-        title=f"{user.display_name}'s Projects",
-        description=(
-            f"**{sort_labels.get(sort_mode, 'Alphabetical')}**"
-            f" ✦ **{filter_label}**"
-            f" ✦ **Page {page + 1}/{total_pages}**"
-        )
+        title=f"{user.display_name}'s Projects"
     )
 
     if not projects:
         embed.add_field(
-            name="No projects found",
-            value=(
-                "There are no projects matching "
-                "the current filter."
-            ),
+            name="No projects match this filter.",
+            value="Create a project or choose a different status filter.",
             inline=False
         )
 
