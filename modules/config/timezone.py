@@ -1,42 +1,11 @@
-import asyncio
-import time
-
 from zoneinfo import available_timezones
-
-import aiohttp
 
 
 # -------------------------------------------------------
 #                  TIMEZONE PROVIDER
 # -------------------------------------------------------
 
-TIMEZONE_API_URL = (
-    "https://www.timeapi.io/api/timezone/availabletimezones"
-)
-TIMEZONE_CACHE_SECONDS = 24 * 60 * 60
-
-_timezone_cache = None
-_timezone_cache_time = 0
-_timezone_cache_lock = asyncio.Lock()
-
-
-def _normalize_timezones(data):
-    if isinstance(data, list):
-        values = data
-    elif isinstance(data, dict):
-        values = data.get(
-            "timezones",
-            data.get("data", [])
-        )
-    else:
-        values = []
-
-    return sorted({
-        value.strip()
-        for value in values
-        if isinstance(value, str)
-        and value.strip()
-    })
+TIMEZONE_HELP_URL = "https://www.iana.org/time-zones"
 
 
 def _zoneinfo_timezones():
@@ -46,67 +15,11 @@ def _zoneinfo_timezones():
 
 
 def get_cached_timezones():
-    if _timezone_cache:
-        return list(
-            _timezone_cache
-        )
-
     return _zoneinfo_timezones()
 
 
 async def get_available_timezones():
-    global _timezone_cache
-    global _timezone_cache_time
-
-    now = time.monotonic()
-    if (
-        _timezone_cache
-        and now - _timezone_cache_time < TIMEZONE_CACHE_SECONDS
-    ):
-        return list(_timezone_cache)
-
-    async with _timezone_cache_lock:
-        now = time.monotonic()
-        if (
-            _timezone_cache
-            and now - _timezone_cache_time < TIMEZONE_CACHE_SECONDS
-        ):
-            return list(_timezone_cache)
-
-        try:
-            timeout = aiohttp.ClientTimeout(
-                total=10
-            )
-            async with aiohttp.ClientSession(
-                timeout=timeout
-            ) as session:
-                async with session.get(
-                    TIMEZONE_API_URL
-                ) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-
-            timezones = _normalize_timezones(
-                data
-            )
-            if not timezones:
-                raise ValueError(
-                    "Timezone API returned no IANA zones."
-                )
-
-            _timezone_cache = timezones
-            _timezone_cache_time = time.monotonic()
-
-        except (
-            aiohttp.ClientError,
-            asyncio.TimeoutError,
-            ValueError,
-            TypeError,
-            OSError
-        ):
-            return get_cached_timezones()
-
-    return list(_timezone_cache)
+    return get_cached_timezones()
 
 
 # -------------------------------------------------------
@@ -115,13 +28,13 @@ async def get_available_timezones():
 
 async def search_timezones(
     search: str,
-    limit: int = 25
+    limit=None
 ):
     normalized_search = (
         (search or "")
         .strip()
         .lower()
-        .replace(" ", "_")
+        .replace("_", " ")
     )
 
     if not normalized_search:
@@ -134,10 +47,11 @@ async def search_timezones(
     partial_matches = []
 
     for timezone in timezones:
-        lowered_timezone = timezone.lower()
-        city = timezone.split("/")[-1].lower()
+        lowered_timezone = timezone.lower().replace("_", " ")
+        city = timezone.split("/")[-1].lower().replace("_", " ")
+        display = get_timezone_display(timezone)[0].lower()
 
-        if lowered_timezone == normalized_search:
+        if lowered_timezone == normalized_search or display == normalized_search:
             exact_matches.append(timezone)
         elif city == normalized_search:
             city_matches.append(timezone)
@@ -146,12 +60,15 @@ async def search_timezones(
         elif normalized_search in lowered_timezone:
             partial_matches.append(timezone)
 
-    return (
+    results = (
         exact_matches
         + city_matches
         + prefix_matches
         + partial_matches
-    )[:limit]
+    )
+
+    results = sort_timezones_for_display(results)
+    return results[:limit] if limit is not None else results
 
 
 async def validate_timezone(
@@ -198,10 +115,44 @@ def get_region_timezones(
             if "/" not in timezone
         ]
 
-    return [
+    region_timezones = [
         timezone
         for timezone in timezones
         if timezone.startswith(
             f"{region}/"
         )
     ]
+
+    return sort_timezones_for_display(region_timezones)
+
+
+def get_timezone_display(timezone):
+    parts = timezone.split("/")
+    region = parts[0].replace("_", " ")
+    label = f"{region}/{parts[-1].replace('_', ' ')}"
+    description = " / ".join(
+        part.replace("_", " ")
+        for part in parts[1:-1]
+    )
+
+    return label, description
+
+
+def sort_timezones_for_display(timezones):
+    return sorted(
+        timezones,
+        key=lambda timezone: (
+            get_timezone_display(timezone)[0].lower(),
+            timezone.lower()
+        )
+    )
+
+
+def get_timezone_option_description(timezone, timezones):
+    label, description = get_timezone_display(timezone)
+    label_count = sum(
+        get_timezone_display(value)[0] == label
+        for value in timezones
+    )
+
+    return description if label_count > 1 else None

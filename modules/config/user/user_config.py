@@ -32,11 +32,6 @@ def get_user_config(
     )
 
     saved_config = profile.get("config", {})
-    if saved_config.get("timezone") == LEGACY_DEFAULT_TIMEZONE:
-        saved_config["timezone"] = None
-        profile["config"] = saved_config
-        profiles[str(user_id)] = profile
-        save_profiles(profiles)
 
     config = DEFAULT_CONFIG.copy()
     config.update(

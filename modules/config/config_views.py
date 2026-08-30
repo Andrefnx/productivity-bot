@@ -11,8 +11,11 @@ from .timezone import (
     get_available_timezones,
     get_cached_timezones,
     get_region_timezones,
+    get_timezone_display,
+    get_timezone_option_description,
     get_timezone_regions,
-    search_timezones
+    search_timezones,
+    TIMEZONE_HELP_URL
 )
 
 
@@ -92,12 +95,7 @@ class TimezoneRegionSelect(
         interaction: discord.Interaction
     ):
         self.settings_view.selected_region = self.values[0]
-        self.settings_view.timezone_is_set = True
         self.settings_view.page = 0
-        self.settings_view.selected_timezone = get_region_timezones(
-            self.settings_view.selected_region,
-            self.settings_view.timezones
-        )[0]
         self.settings_view.build_components()
 
         await interaction.response.edit_message(
@@ -125,12 +123,15 @@ class TimezoneSelect(
             placeholder="Select timezone",
             options=[
                 discord.SelectOption(
-                    label=timezone.replace(
-                        "_",
-                        " "
-                    )[-100:],
+                    label=get_timezone_display(timezone)[0][:100],
                     value=timezone,
-                    default=(timezone == settings_view.selected_timezone)
+                    description=(
+                        get_timezone_option_description(
+                            timezone,
+                            timezones
+                        ) or None
+                    ),
+                    default=(timezone == settings_view.draft_timezone)
                 )
                 for timezone in page_timezones
             ],
@@ -141,6 +142,7 @@ class TimezoneSelect(
         self,
         interaction: discord.Interaction
     ):
+        self.settings_view.draft_timezone = self.values[0]
         self.settings_view.selected_timezone = self.values[0]
         self.settings_view.timezone_is_set = True
         await interaction.response.edit_message(
@@ -175,11 +177,13 @@ class DateTimeSettingsView(
             "time_format",
             "12h"
         )
-        self.timezone_is_set = config.get("timezone") is not None
-        self.selected_timezone = config.get("timezone")
+        self.saved_timezone = config.get("timezone")
+        self.draft_timezone = self.saved_timezone
+        self.timezone_is_set = self.saved_timezone is not None
+        self.selected_timezone = self.draft_timezone
         self.selected_region = (
-            self.selected_timezone.split("/")[0]
-            if self.selected_timezone and "/" in self.selected_timezone
+            self.saved_timezone.split("/")[0]
+            if self.saved_timezone and "/" in self.saved_timezone
             else "Other"
         )
         regions = get_timezone_regions(
@@ -187,27 +191,30 @@ class DateTimeSettingsView(
         )
         if self.selected_region not in regions:
             self.selected_region = regions[0]
-        if self.selected_timezone not in self.timezones:
+        if self.saved_timezone not in self.timezones:
+            self.saved_timezone = None
+            self.draft_timezone = None
             self.selected_timezone = get_region_timezones(
                 self.selected_region,
                 self.timezones
             )[0]
+            self.timezone_is_set = False
         region_timezones = get_region_timezones(
             self.selected_region,
             self.timezones
         )
         self.page = (
             region_timezones.index(
-                self.selected_timezone
+                self.draft_timezone
             ) // 25
-            if self.selected_timezone in region_timezones
+            if self.draft_timezone in region_timezones
             else 0
         )
         self.build_components()
 
     def create_embed(self):
         timezone = (
-            self.selected_timezone
+            self.draft_timezone
             if self.timezone_is_set
             else "Not set"
         )
@@ -216,7 +223,9 @@ class DateTimeSettingsView(
             title="Date & Time",
             description=(
                 f"Timezone: `{timezone}`\n"
-                f"Time format: `{self.selected_time_format}`"
+                f"Time format: `{self.selected_time_format}`\n\n"
+                f"Not sure which timezone is yours? Refer to "
+                f"[this guide]({TIMEZONE_HELP_URL})."
             )
         )
 
@@ -287,7 +296,7 @@ class DateTimeSettingsView(
             update_user_config(
                 self.config_view.owner.id,
                 "timezone",
-                self.selected_timezone
+                self.draft_timezone
             )
         update_user_config(
             self.config_view.owner.id,
@@ -501,38 +510,6 @@ class DateTimeSettingsModal(
 
             return
 
-        if len(
-            results
-        ) == 1:
-            timezone = results[0]
-
-            update_user_config(
-                user_id=(
-                    self.config_view.owner.id
-                ),
-                key="timezone",
-                value=timezone
-            )
-
-            update_user_config(
-                user_id=(
-                    self.config_view.owner.id
-                ),
-                key="time_format",
-                value=time_format
-            )
-
-            self.config_view.build_components()
-
-            await interaction.response.edit_message(
-                embed=create_config_embed(
-                    self.config_view.owner
-                ),
-                view=self.config_view
-            )
-
-            return
-
         view = TimezoneResultsView(
             config_view=self.config_view,
             results=results,
@@ -562,37 +539,24 @@ class TimezoneResultSelect(
 ):
     def __init__(
         self,
-        results
+        results,
+        page=0
     ):
-        options = []
-
-        for timezone in results[:25]:
-            readable = timezone.replace(
-                "_",
-                " "
-            )
-
-            parts = readable.split(
-                "/"
-            )
-
-            city = parts[-1]
-
-            region = (
-                " / ".join(
-                    parts[:-1]
-                )
-                if len(parts) > 1
-                else "Timezone"
-            )
-
-            options.append(
-                discord.SelectOption(
-                    label=city[:100],
-                    value=timezone,
-                    description=region[:100]
+        start = page * 25
+        page_results = results[start:start + 25]
+        options = [
+            discord.SelectOption(
+                label=get_timezone_display(timezone)[0][:100],
+                value=timezone,
+                description=(
+                    get_timezone_option_description(
+                        timezone,
+                        results
+                    ) or None
                 )
             )
+            for timezone in page_results
+        ]
 
         super().__init__(
             placeholder="Choose your timezone",
@@ -610,33 +574,28 @@ class TimezoneResultSelect(
             self.values[0]
         )
 
-        config_view = (
-            self.view.config_view
+        timezones = await get_available_timezones()
+        settings_view = DateTimeSettingsView(
+            config_view=self.view.config_view,
+            timezones=timezones
         )
-
-        update_user_config(
-            user_id=(
-                config_view.owner.id
-            ),
-            key="timezone",
-            value=timezone
+        settings_view.draft_timezone = timezone
+        settings_view.selected_timezone = timezone
+        settings_view.timezone_is_set = True
+        settings_view.selected_time_format = self.view.time_format
+        settings_view.selected_region = timezone.split("/")[0]
+        settings_view.page = (
+            get_region_timezones(
+                settings_view.selected_region,
+                timezones
+            ).index(timezone)
+            // 25
         )
-
-        update_user_config(
-            user_id=(
-                config_view.owner.id
-            ),
-            key="time_format",
-            value=self.view.time_format
-        )
-
-        config_view.build_components()
+        settings_view.build_components()
 
         await interaction.response.edit_message(
-            embed=create_config_embed(
-                config_view.owner
-            ),
-            view=config_view
+            embed=settings_view.create_embed(),
+            view=settings_view
         )
 
 
@@ -667,12 +626,36 @@ class TimezoneResultsView(
         )
 
         self.search = search
+        self.results = results
+        self.page = 0
+        self.build_components()
+
+    def create_embed(self):
+        total_pages = max(1, (len(self.results) + 24) // 25)
+        return discord.Embed(
+            title="Choose Timezone",
+            description=(
+                f"Several timezones matched **{self.search}**.\n\n"
+                f"Page {self.page + 1}/{total_pages}"
+            )
+        )
+
+    def build_components(self):
+        self.clear_items()
 
         self.add_item(
             TimezoneResultSelect(
-                results
+                self.results,
+                page=self.page
             )
         )
+
+        self.previous_page.disabled = self.page <= 0
+        self.next_page.disabled = (self.page + 1) * 25 >= len(self.results)
+        self.add_item(self.previous_page)
+        self.add_item(self.next_page)
+        self.add_item(self.search_again)
+        self.add_item(self.back_settings)
 
     async def interaction_check(
         self,
@@ -693,6 +676,32 @@ class TimezoneResultsView(
             return False
 
         return True
+
+    @discord.ui.button(
+        label="◀",
+        style=discord.ButtonStyle.secondary,
+        row=1
+    )
+    async def previous_page(self, interaction, button):
+        self.page -= 1
+        self.build_components()
+        await interaction.response.edit_message(
+            embed=self.create_embed(),
+            view=self
+        )
+
+    @discord.ui.button(
+        label="▶",
+        style=discord.ButtonStyle.secondary,
+        row=1
+    )
+    async def next_page(self, interaction, button):
+        self.page += 1
+        self.build_components()
+        await interaction.response.edit_message(
+            embed=self.create_embed(),
+            view=self
+        )
 
     @discord.ui.button(
         label="Search Again",
