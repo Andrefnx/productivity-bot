@@ -114,7 +114,7 @@ class EmptyActiveSprintTests(unittest.TestCase):
             "modules.sprints.active_sprint.get_channel_config",
             return_value=DEFAULT_CHANNEL_CONFIG.copy()
         ), patch(
-            "modules.sprints.active_sprint.remove_active_sprint"
+            "modules.sprints.active_sprint.update_active_sprint_status"
         ):
             asyncio.run(sprint.confirm_cancel(interaction))
         self.assertTrue(sprint.finished)

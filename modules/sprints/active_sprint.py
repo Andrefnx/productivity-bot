@@ -52,7 +52,7 @@ from .system_messages import (
     create_started_embed,
     create_waiting_embed,
     register_active_sprint,
-    remove_active_sprint
+    update_active_sprint_status
 )
 from .users import (
     JoinSprintView,
@@ -421,7 +421,7 @@ class SprintView(
             await self.message.channel.send(
                 content=(
                     f"{mentions}\n"
-                    "The sprint is about to start."
+                    "⏳The sprint is about to start!"
                 ),
                 allowed_mentions=discord.AllowedMentions(
                     everyone=False,
@@ -527,6 +527,13 @@ class SprintView(
         self.end_timestamp = int(
             time.time()
             + self.duration * 60
+        )
+
+        update_active_sprint_status(
+            self.message.id,
+            "active",
+            start_timestamp=self.start_timestamp,
+            end_timestamp=self.end_timestamp
         )
 
         await self.update_started_message()
@@ -661,19 +668,20 @@ class SprintView(
         channel = self.message.channel
         message_id = self.message.id
 
-        remove_active_sprint(
-            message_id
+        update_active_sprint_status(
+            message_id,
+            "completed",
+            start_timestamp=self.start_timestamp,
+            end_timestamp=self.end_timestamp
         )
 
-        try:
-            await self.message.delete()
-
-        except (
-            discord.NotFound,
-            discord.Forbidden,
-            discord.HTTPException
-        ):
-            pass
+        await self.edit_public_message(
+            embed=discord.Embed(
+                title="Sprint finished!",
+                description="Time is up!"
+            ),
+            view=None
+        )
 
         await start_results_registration(
             channel=channel,
@@ -707,8 +715,11 @@ class SprintView(
         )
 
         if self.message is not None:
-            remove_active_sprint(
-                self.message.id
+            update_active_sprint_status(
+                self.message.id,
+                "completed",
+                start_timestamp=self.start_timestamp,
+                end_timestamp=self.end_timestamp
             )
 
         self.stop()
@@ -735,6 +746,17 @@ class SprintView(
             time.time()
             + starts_in * 60
         )
+
+        if self.message is not None and hasattr(self.message, "id"):
+            update_active_sprint_status(
+                self.message.id,
+                "countdown",
+                start_timestamp=self.start_timestamp,
+                end_timestamp=(
+                    self.start_timestamp
+                    + duration * 60
+                )
+            )
 
         self.end_timestamp = None
         self.started = False
@@ -766,6 +788,13 @@ class SprintView(
         self.end_timestamp = int(
             time.time()
             + duration * 60
+        )
+
+        update_active_sprint_status(
+            self.message.id,
+            "active",
+            start_timestamp=self.start_timestamp,
+            end_timestamp=self.end_timestamp
         )
 
         await self.update_started_message()
@@ -819,8 +848,11 @@ class SprintView(
         )
 
         if self.message is not None:
-            remove_active_sprint(
-                self.message.id
+            update_active_sprint_status(
+                self.message.id,
+                "cancelled",
+                start_timestamp=self.start_timestamp,
+                end_timestamp=self.end_timestamp
             )
 
         await self.edit_public_message(
@@ -1381,7 +1413,13 @@ class SprintCreateModal(
         register_active_sprint(
             guild_id=interaction.guild_id,
             channel_id=interaction.channel_id,
-            message_id=view.message.id
+            message_id=view.message.id,
+            status="countdown",
+            start_timestamp=view.start_timestamp,
+            end_timestamp=(
+                view.start_timestamp
+                + duration * 60
+            )
         )
 
         view.schedule_start_warning()

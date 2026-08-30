@@ -1,5 +1,7 @@
 import json
 import os
+import re
+import time
 
 import discord
 
@@ -31,6 +33,36 @@ ACTIVE_SPRINTS_FILE = os.path.join(
     DATA_DIRECTORY,
     "active_sprints.json"
 )
+
+LIFECYCLE_STATUS_MAP = {
+    "scheduled": "countdown",
+    "countdown": "countdown",
+    "waiting": "countdown",
+    "active": "active",
+    "running": "active",
+    "started": "active",
+    "finished": "completed",
+    "complete": "completed",
+    "completed": "completed",
+    "ended": "completed",
+    "cancelled": "cancelled",
+    "canceled": "cancelled",
+    "interrupted": "interrupted",
+    "aborted": "interrupted"
+}
+
+TERMINAL_SPRINT_STATUSES = {
+    "completed",
+    "cancelled",
+    "interrupted"
+}
+
+
+def normalize_sprint_status(status):
+    return LIFECYCLE_STATUS_MAP.get(
+        str(status or "active").lower(),
+        "active"
+    )
 
 
 def load_active_sprints():
@@ -79,14 +111,20 @@ def save_active_sprints(
 def register_active_sprint(
     guild_id,
     channel_id,
-    message_id
+    message_id,
+    status="countdown",
+    start_timestamp=None,
+    end_timestamp=None
 ):
     sprints = load_active_sprints()
 
     sprint_data = {
         "guild_id": guild_id,
         "channel_id": channel_id,
-        "message_id": message_id
+        "message_id": message_id,
+        "status": normalize_sprint_status(status),
+        "start_timestamp": start_timestamp,
+        "end_timestamp": end_timestamp
     }
 
     sprints = [
@@ -104,6 +142,28 @@ def register_active_sprint(
     save_active_sprints(
         sprints
     )
+
+
+def update_active_sprint_status(
+    message_id,
+    status,
+    start_timestamp=None,
+    end_timestamp=None
+):
+    sprints = load_active_sprints()
+
+    for sprint in sprints:
+        if sprint.get("message_id") != message_id:
+            continue
+
+        sprint["status"] = normalize_sprint_status(status)
+        if start_timestamp is not None:
+            sprint["start_timestamp"] = start_timestamp
+        if end_timestamp is not None:
+            sprint["end_timestamp"] = end_timestamp
+        break
+
+    save_active_sprints(sprints)
 
 
 def remove_active_sprint(
@@ -357,6 +417,13 @@ def create_interrupted_embed():
     )
 
 
+def create_completed_embed():
+    return discord.Embed(
+        title="Sprint finished!",
+        description="Time is up!"
+    )
+
+
 # -------------------------------------------------------
 #                 INTERRUPTED SPRINTS
 # -------------------------------------------------------
@@ -373,6 +440,42 @@ async def mark_message_as_interrupted(
         embed=interrupted_embed,
         view=None
     )
+
+
+def get_message_end_timestamp(message):
+    if not message.embeds:
+        return None
+
+    embed = message.embeds[0]
+    text = "\n".join(
+        [embed.description or ""]
+        + [field.value for field in embed.fields]
+    )
+    timestamps = re.findall(r"<t:(\d+):[RFDfdt]>", text)
+
+    if embed.title == start_title and timestamps:
+        return int(timestamps[0])
+
+    if embed.title == waiting_title and timestamps:
+        duration_match = re.search(r"(\d+) minutes", text)
+        if duration_match:
+            return int(timestamps[0]) + int(duration_match.group(1)) * 60
+
+    return None
+
+
+def should_recover_as_completed(sprint, message, now=None):
+    now = int(time.time()) if now is None else now
+    status = normalize_sprint_status(sprint.get("status"))
+
+    if status in TERMINAL_SPRINT_STATUSES:
+        return False
+
+    end_timestamp = sprint.get("end_timestamp")
+    if end_timestamp is None:
+        end_timestamp = get_message_end_timestamp(message)
+
+    return end_timestamp is not None and now >= int(end_timestamp)
 
 
 async def recover_saved_sprints(
@@ -409,9 +512,17 @@ async def recover_saved_sprints(
                 message_id
             )
 
-            await mark_message_as_interrupted(
-                message
-            )
+            status = normalize_sprint_status(sprint.get("status"))
+            if should_recover_as_completed(sprint, message):
+                update_active_sprint_status(message_id, "completed")
+                await message.edit(
+                    content=None,
+                    embed=create_completed_embed(),
+                    view=None
+                )
+            elif status not in TERMINAL_SPRINT_STATUSES:
+                update_active_sprint_status(message_id, "interrupted")
+                await mark_message_as_interrupted(message)
 
         except (
             discord.NotFound,
@@ -419,11 +530,6 @@ async def recover_saved_sprints(
             discord.HTTPException
         ):
             pass
-
-    save_active_sprints(
-        []
-    )
-
 
 async def recover_old_sprints(
     client: discord.Client
@@ -460,9 +566,14 @@ async def recover_old_sprints(
                         continue
 
                     try:
-                        await mark_message_as_interrupted(
-                            message
-                        )
+                        if should_recover_as_completed({}, message):
+                            await message.edit(
+                                content=None,
+                                embed=create_completed_embed(),
+                                view=None
+                            )
+                        else:
+                            await mark_message_as_interrupted(message)
 
                     except (
                         discord.NotFound,
