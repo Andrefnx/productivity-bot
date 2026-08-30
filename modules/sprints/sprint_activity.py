@@ -181,7 +181,6 @@ class ActivityProjectView(SprintActivityPickerView):
             embed=None,
             view=None
         )
-
         await self.sprint_view.update_current_message()
         self.stop()
 
@@ -325,16 +324,33 @@ class SprintResultsView(discord.ui.View):
         final_embed = create_results_embed(
             get_sorted_results(self.participants)
         )
-        await self.message.channel.send(embed=final_embed)
+        try:
+            await self.message.channel.send(
+                embed=final_embed
+            )
+        except (
+            discord.Forbidden,
+            discord.HTTPException
+        ) as error:
+            print("SPRINT RESULTS NOTIFICATION ERROR:")
+            print(repr(error))
         self.results_sent = True
 
     async def close_registration_message(self):
         if self.message is None:
             return
-        await self.message.edit(
-            content="Word count registration closed.",
-            view=None
-        )
+        try:
+            await self.message.edit(
+                content="Word count registration closed.",
+                view=None
+            )
+        except (
+            discord.NotFound,
+            discord.Forbidden,
+            discord.HTTPException
+        ) as error:
+            print("SPRINT RESULTS MESSAGE UPDATE ERROR:")
+            print(repr(error))
 
     async def finish_if_complete(self):
         if self.closed:

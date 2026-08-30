@@ -272,6 +272,7 @@ class SprintView(
         self.message = None
         self.sprint_timer = None
         self.empty_sprint_timer = None
+        self.start_warning_timer = None
 
         self.participants = SprintParticipants(
             sprint_id=self.sprint_id
@@ -305,8 +306,7 @@ class SprintView(
             updated=updated
         )
 
-        await self.message.edit(
-            content=None,
+        await self.edit_public_message(
             embed=waiting_embed,
             view=self
         )
@@ -327,11 +327,32 @@ class SprintView(
             )
         )
 
-        await self.message.edit(
-            content=None,
+        await self.edit_public_message(
             embed=started_embed,
             view=self
         )
+
+    async def edit_public_message(
+        self,
+        embed,
+        view
+    ):
+        if self.message is None:
+            return
+
+        try:
+            await self.message.edit(
+                content=None,
+                embed=embed,
+                view=view
+            )
+        except (
+            discord.NotFound,
+            discord.Forbidden,
+            discord.HTTPException
+        ) as error:
+            print("SPRINT MESSAGE UPDATE ERROR:")
+            print(repr(error))
 
 
 # -------------------------------------------------------
@@ -388,6 +409,65 @@ class SprintView(
                 repr(error)
             )
 
+    async def send_start_warning(
+        self
+    ):
+        mentions = self.participants.get_ping_text()
+
+        if not mentions or self.finished or self.started:
+            return
+
+        try:
+            await self.message.channel.send(
+                content=(
+                    f"{mentions}\n"
+                    "The sprint is about to start."
+                ),
+                allowed_mentions=discord.AllowedMentions(
+                    everyone=False,
+                    users=True,
+                    roles=False
+                )
+            )
+        except (
+            discord.Forbidden,
+            discord.HTTPException
+        ) as error:
+            print("SPRINT START WARNING ERROR:")
+            print(repr(error))
+
+    def cancel_start_warning(
+        self
+    ):
+        if self.start_warning_timer is not None:
+            self.start_warning_timer.cancel()
+            self.start_warning_timer = None
+
+    def schedule_start_warning(
+        self
+    ):
+        self.cancel_start_warning()
+
+        warning_delay = self.start_timestamp - int(time.time()) - 60
+        if warning_delay <= 0:
+            return
+
+        self.start_warning_timer = asyncio.create_task(
+            self.wait_for_start_warning(warning_delay)
+        )
+
+    async def wait_for_start_warning(
+        self,
+        warning_delay
+    ):
+        try:
+            await asyncio.sleep(warning_delay)
+            await self.send_start_warning()
+        except asyncio.CancelledError:
+            return
+        finally:
+            self.start_warning_timer = None
+
 
 # -------------------------------------------------------
 #                ENDING NOTIFICATION
@@ -442,6 +522,7 @@ class SprintView(
             return
 
         self.started = True
+        self.cancel_start_warning()
 
         self.end_timestamp = int(
             time.time()
@@ -571,6 +652,7 @@ class SprintView(
 
         self.finished = True
         self.cancel_empty_sprint_timeout()
+        self.cancel_start_warning()
 
         finished_participants = (
             self.participants.snapshot()
@@ -615,18 +697,19 @@ class SprintView(
 
         self.finished = True
         self.cancel_empty_sprint_timeout()
+        self.cancel_start_warning()
 
         empty_embed = create_empty_sprint_embed()
 
-        await self.message.edit(
-            content=None,
+        await self.edit_public_message(
             embed=empty_embed,
             view=None
         )
 
-        remove_active_sprint(
-            self.message.id
-        )
+        if self.message is not None:
+            remove_active_sprint(
+                self.message.id
+            )
 
         self.stop()
 
@@ -642,6 +725,8 @@ class SprintView(
     ):
         if self.sprint_timer is not None:
             self.sprint_timer.cancel()
+
+        self.cancel_start_warning()
 
         self.duration = duration
         self.starts_in = starts_in
@@ -662,6 +747,7 @@ class SprintView(
         self.sprint_timer = asyncio.create_task(
             self.run_sprint()
         )
+        self.schedule_start_warning()
 
 
 # -------------------------------------------------------
@@ -718,22 +804,29 @@ class SprintView(
 
         self.cancel_empty_sprint_timeout()
 
+        if self.finished:
+            await interaction.response.send_message(
+                already_finished_message,
+                ephemeral=True
+            )
+            return
+
         self.finished = True
+        self.cancel_start_warning()
 
         cancelled_embed = create_cancelled_embed(
             user_mention=interaction.user.mention
         )
 
         if self.message is not None:
-            await self.message.edit(
-                content=None,
-                embed=cancelled_embed,
-                view=None
-            )
-
             remove_active_sprint(
                 self.message.id
             )
+
+        await self.edit_public_message(
+            embed=cancelled_embed,
+            view=None
+        )
 
         await interaction.response.edit_message(
             content=cancelled_response_message,
@@ -1281,13 +1374,17 @@ class SprintCreateModal(
 
         message = await interaction.original_response()
 
-        view.message = message
+        view.message = await interaction.channel.fetch_message(
+            message.id
+        )
 
         register_active_sprint(
             guild_id=interaction.guild_id,
             channel_id=interaction.channel_id,
-            message_id=message.id
+            message_id=view.message.id
         )
+
+        view.schedule_start_warning()
 
         view.sprint_timer = asyncio.create_task(
             view.run_sprint()

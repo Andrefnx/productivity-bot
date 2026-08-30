@@ -81,17 +81,24 @@ async def send_result_reminder(
             for sprint_user in pending
         )
 
-        await results_view.message.channel.send(
-            content=(
-                f"{mentions}\n"
-                "2 minutes left to register your word count."
-            ),
-            allowed_mentions=discord.AllowedMentions(
-                everyone=False,
-                users=True,
-                roles=False
+        try:
+            await results_view.message.channel.send(
+                content=(
+                    f"{mentions}\n"
+                    "2 minutes left to register your word count."
+                ),
+                allowed_mentions=discord.AllowedMentions(
+                    everyone=False,
+                    users=True,
+                    roles=False
+                )
             )
-        )
+        except (
+            discord.Forbidden,
+            discord.HTTPException
+        ) as error:
+            print("SPRINT RESULTS REMINDER ERROR:")
+            print(repr(error))
 
     except asyncio.CancelledError:
         return

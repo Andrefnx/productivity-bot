@@ -158,7 +158,7 @@ class SprintJoinTests(unittest.TestCase):
         start_view = StartWordCountView(sprint, 111111111111111111, None)
         labels = [item.label for item in start_view.children]
 
-        self.assertEqual(labels, ["Custom", "↩ Back"])
+        self.assertEqual(labels, ["Custom", "No Word Count", "↩ Back"])
 
     def test_leave_still_responds_and_removes_participant(self):
         sprint = self.create_sprint()

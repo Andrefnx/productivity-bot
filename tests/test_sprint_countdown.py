@@ -3,6 +3,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+import discord
+
 from modules.config.channel.channel_config import DEFAULT_CHANNEL_CONFIG
 from modules.config.sprint.sprint_config import DEFAULT_SPRINT_CONFIG
 from modules.sprints.active_sprint import SprintView
@@ -84,6 +86,45 @@ class SprintCountdownTests(unittest.TestCase):
 
         self.assertEqual(sprint.start_timestamp, original_timestamp)
         sprint.update_current_message.assert_awaited_once()
+
+    def test_waiting_time_reschedules_the_one_minute_warning(self):
+        sprint = self.create_sprint(10)
+        sprint.message = SimpleNamespace(edit=AsyncMock())
+        old_warning = SimpleNamespace(cancel=unittest.mock.MagicMock())
+        sprint.start_warning_timer = old_warning
+
+        def create_task(coroutine):
+            coroutine.close()
+            return unittest.mock.MagicMock()
+
+        with patch(
+            "modules.sprints.active_sprint.time.time",
+            return_value=2000
+        ), patch(
+            "modules.sprints.active_sprint.asyncio.create_task",
+            side_effect=create_task
+        ) as create_task:
+            asyncio.run(sprint.restart_waiting_timer(30, 5))
+
+        old_warning.cancel.assert_called_once()
+        self.assertEqual(sprint.start_timestamp, 2300)
+        self.assertEqual(create_task.call_count, 2)
+
+    def test_start_warning_ignores_missing_send_permission(self):
+        sprint = self.create_sprint(5)
+        sprint.message = SimpleNamespace(
+            channel=SimpleNamespace(
+                send=AsyncMock(side_effect=discord.Forbidden(
+                    response=SimpleNamespace(status=403, reason="Missing Access"),
+                    message="Missing Access"
+                ))
+            )
+        )
+        sprint.participants.users[1] = SimpleNamespace(mention="<@1>")
+
+        asyncio.run(sprint.send_start_warning())
+
+        sprint.message.channel.send.assert_awaited_once()
 
 
 if __name__ == "__main__":

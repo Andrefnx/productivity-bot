@@ -408,7 +408,10 @@ class ProjectPickerView(
         self,
         owner_id: int,
         on_confirm,
-        show_last_project=True
+        show_last_project=True,
+        sort_mode="alphabetical",
+        status_filter="all",
+        page=0
     ):
         super().__init__(
             timeout=120
@@ -417,27 +420,80 @@ class ProjectPickerView(
         self.owner_id = owner_id
         self.on_confirm = on_confirm
         self.show_last_project = show_last_project
+        self.sort_mode = sort_mode
+        self.status_filter = status_filter
+        self.page = page
 
         self.selected_project_id = None
+        self.page_projects = []
+        self.total_pages = 1
 
         self.refresh_components()
+
+    def get_filtered_projects(
+        self
+    ):
+        projects = get_user_projects(
+            self.owner_id
+        )
+
+        return sort_projects(
+            filter_projects(
+                projects,
+                self.status_filter
+            ),
+            self.sort_mode
+        )
 
     def refresh_components(
         self
     ):
         self.clear_items()
 
-        projects = get_user_projects(
-            self.owner_id
+        (
+            self.page_projects,
+            self.page,
+            self.total_pages
+        ) = paginate_projects(
+            self.get_filtered_projects(),
+            self.page
+        )
+
+        self.add_item(
+            ProjectSortSelect(
+                self.sort_mode
+            )
+        )
+
+        self.add_item(
+            ProjectFilterSelect(
+                self.status_filter
+            )
         )
 
         self.add_item(
             ProjectSelect(
-                projects[:25],
+                self.page_projects,
                 selected_project_id=(
                     self.selected_project_id
                 )
             )
+        )
+
+        self.previous_page.disabled = (
+            self.page <= 0
+        )
+
+        self.next_page.disabled = (
+            self.page >= self.total_pages - 1
+        )
+
+        self.add_item(
+            self.previous_page
+        )
+
+        self.add_item(
+            self.next_page
         )
 
         self.add_item(
@@ -456,6 +512,25 @@ class ProjectPickerView(
         self.select_button.disabled = (
             self.selected_project_id
             is None
+        )
+
+    def create_current_embed(
+        self
+    ):
+        return create_projects_embed(
+            user=type(
+                "ProjectOwner",
+                (),
+                {
+                    "id": self.owner_id,
+                    "display_name": "Your"
+                }
+            )(),
+            projects=self.page_projects,
+            sort_mode=self.sort_mode,
+            status_filter=self.status_filter,
+            page=self.page,
+            total_pages=self.total_pages
         )
 
     async def interaction_check(
@@ -501,16 +576,70 @@ class ProjectPickerView(
 
         await interaction.response.edit_message(
             content=None,
-            embed=create_project_picker_embed(
-                selected_project=project
-            ),
+            embed=self.create_current_embed(),
             view=self
         )
+
+    async def refresh_message(
+        self,
+        interaction
+    ):
+        self.refresh_components()
+
+        await interaction.response.edit_message(
+            content=None,
+            embed=self.create_current_embed(),
+            view=self
+        )
+
+    async def change_sort(
+        self,
+        interaction,
+        sort_mode
+    ):
+        self.sort_mode = sort_mode
+        self.page = 0
+        await self.refresh_message(interaction)
+
+    async def change_filter(
+        self,
+        interaction,
+        status_filter
+    ):
+        self.status_filter = status_filter
+        self.page = 0
+        await self.refresh_message(interaction)
+
+    @discord.ui.button(
+        label="◀",
+        style=discord.ButtonStyle.secondary,
+        row=3
+    )
+    async def previous_page(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        self.page -= 1
+        await self.refresh_message(interaction)
+
+    @discord.ui.button(
+        label="▶",
+        style=discord.ButtonStyle.secondary,
+        row=3
+    )
+    async def next_page(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        self.page += 1
+        await self.refresh_message(interaction)
 
     @discord.ui.button(
         label="Select Project",
         style=discord.ButtonStyle.primary,
-        row=1
+        row=4
     )
     async def select_button(
         self,
@@ -538,7 +667,7 @@ class ProjectPickerView(
     @discord.ui.button(
         label="Create Project",
         style=discord.ButtonStyle.secondary,
-        row=1
+        row=4
     )
     async def create_button(
         self,
@@ -551,14 +680,15 @@ class ProjectPickerView(
             view = ProjectPickerView(
                 owner_id=self.owner_id,
                 on_confirm=self.on_confirm,
-                show_last_project=(
-                    self.show_last_project
-                )
+                show_last_project=self.show_last_project,
+                sort_mode=self.sort_mode,
+                status_filter=self.status_filter,
+                page=self.page
             )
 
             await back_interaction.response.edit_message(
                 content=None,
-                embed=create_project_picker_embed(),
+                embed=view.create_current_embed(),
                 view=view
             )
 
@@ -591,7 +721,7 @@ class ProjectPickerView(
     @discord.ui.button(
         label="Use Last Project",
         style=discord.ButtonStyle.secondary,
-        row=3
+        row=4
     )
     async def last_project_button(
         self,
@@ -754,13 +884,13 @@ class ProjectDetailView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
+        view = UserProjectsView(
+            owner=self.owner
+        )
+
         await interaction.response.edit_message(
-            embed=create_projects_embed(
-                self.owner
-            ),
-            view=UserProjectsView(
-                owner=self.owner
-            )
+            embed=view.create_current_embed(),
+            view=view
         )
 
     @discord.ui.button(
@@ -1115,3 +1245,99 @@ class UserProjectsView(
             interaction,
             self.owner
         )
+
+
+class DeleteProjectConfirmationView(
+    discord.ui.View
+):
+    def __init__(
+        self,
+        owner,
+        project_id
+    ):
+        super().__init__(
+            timeout=120
+        )
+
+        self.owner = owner
+        self.project_id = project_id
+
+    async def interaction_check(
+        self,
+        interaction: discord.Interaction
+    ):
+        if interaction.user.id != self.owner.id:
+            await interaction.response.send_message(
+                "This project belongs to another user.",
+                ephemeral=True
+            )
+            return False
+
+        return True
+
+    @discord.ui.button(
+        label="Confirm Delete",
+        style=discord.ButtonStyle.danger
+    )
+    async def confirm_delete(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        deleted = delete_project(
+            self.owner.id,
+            self.project_id
+        )
+
+        if not deleted:
+            await interaction.response.send_message(
+                "This project was already deleted.",
+                ephemeral=True
+            )
+            return
+
+        clear_last_project_if_matches(
+            self.owner.id,
+            self.project_id
+        )
+
+        view = UserProjectsView(
+            owner=self.owner
+        )
+
+        await interaction.response.edit_message(
+            content=None,
+            embed=view.create_current_embed(),
+            view=view
+        )
+        self.stop()
+
+    @discord.ui.button(
+        label="↩ Back",
+        style=discord.ButtonStyle.secondary
+    )
+    async def back(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        project = get_project(
+            self.owner.id,
+            self.project_id
+        )
+
+        if project is None:
+            await interaction.response.send_message(
+                "This project was already deleted.",
+                ephemeral=True
+            )
+            return
+
+        await interaction.response.edit_message(
+            embed=create_project_embed(project),
+            view=ProjectDetailView(
+                owner=self.owner,
+                project_id=self.project_id
+            )
+        )
+        self.stop()

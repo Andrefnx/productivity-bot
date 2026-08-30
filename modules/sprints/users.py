@@ -98,7 +98,6 @@ class SprintUser:
 
         if self.project_id is not None:
             self.set_last_project()
-
     def get_participant_text(self):
         if self.word_count_enabled:
             activity = f"{self.initial_wc:,} words"
@@ -125,12 +124,13 @@ class SprintParticipants:
         if user.id in self.users:
             return False
 
-        self.users[user.id] = SprintUser(
+        sprint_user = SprintUser(
             user=user,
             sprint_id=self.sprint_id,
             project=project,
             initial_wc=initial_wc
         )
+        self.users[user.id] = sprint_user
         return True
 
     def remove_user(self, user_id: int):
@@ -225,6 +225,9 @@ class SprintActivityPickerView(ProjectPickerView):
     async def project_selected(self, interaction, project):
         await self.open_word_count(interaction, project)
 
+    async def join_project(self, interaction, project):
+        await self.project_selected(interaction, project)
+
     async def open_word_count(self, interaction, project):
         await interaction.response.edit_message(
             content=None,
@@ -307,17 +310,29 @@ class StartWordCountView(discord.ui.View):
         self,
         owner_id,
         project,
-        on_confirm,
-        back_callback
+        on_confirm=None,
+        back_callback=None
     ):
         super().__init__(timeout=120)
-        self.owner_id = owner_id
-        self.project = project
-        self.on_confirm = on_confirm
-        self.back_callback = back_callback
 
-        if project is None:
-            self.remove_item(self.total)
+        if hasattr(owner_id, "participants"):
+            self.sprint_view = owner_id
+            self.owner_id = project
+            self.project = on_confirm
+            self.on_confirm = self.finish_legacy_join
+            self.back_callback = self.back_to_legacy_picker
+        else:
+            self.sprint_view = None
+            self.owner_id = owner_id
+            self.project = project
+            self.on_confirm = on_confirm
+            self.back_callback = back_callback
+
+        if self.project is None:
+            for item in self.children:
+                if getattr(item, "label", None) == "Total":
+                    self.remove_item(item)
+                    break
 
     async def interaction_check(self, interaction):
         if interaction.user.id != self.owner_id:
@@ -333,6 +348,54 @@ class StartWordCountView(discord.ui.View):
             interaction,
             self.project,
             initial_wc
+        )
+
+    async def finish_legacy_join(self, interaction, project, initial_wc):
+        if self.sprint_view.participants.has_user(interaction.user.id):
+            await interaction.response.send_message(
+                "You are already in this sprint.",
+                ephemeral=True
+            )
+            return
+
+        added = self.sprint_view.participants.add_user(
+            user=interaction.user,
+            project=project,
+            initial_wc=initial_wc
+        )
+
+        if not added:
+            await interaction.response.send_message(
+                "You are already in this sprint.",
+                ephemeral=True
+            )
+            return
+
+        self.sprint_view.participant_joined()
+        project_name = project.get("name") if project else "No project"
+        activity = (
+            f"{int(initial_wc):,} words"
+            if initial_wc is not None
+            else "No word count"
+        )
+        await interaction.response.edit_message(
+            content=None,
+            embed=discord.Embed(
+                title="Joined sprint",
+                description=f"**{project_name}** ✦ {activity}"
+            ),
+            view=None
+        )
+        await self.sprint_view.update_current_message()
+
+    async def back_to_legacy_picker(self, interaction):
+        await interaction.response.edit_message(
+            content=None,
+            embed=create_project_picker_embed(),
+            view=JoinSprintView(
+                sprint_view=self.sprint_view,
+                user_id=self.owner_id
+            )
         )
 
     @discord.ui.button(
