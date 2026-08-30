@@ -12,9 +12,12 @@ from modules.config.config_views import (
     create_config_embed
 )
 from modules.config.timezone import (
+    get_browse_timezones,
     get_cached_timezones,
+    get_canonical_timezone,
     get_region_timezones,
     get_timezone_display,
+    get_timezone_regions,
     search_timezones
 )
 from modules.config.user.user_config import (
@@ -133,7 +136,7 @@ class TimezonePrivacyTests(unittest.TestCase):
         )
         selected = next(option for option in timezone_select.options if option.default)
         self.assertEqual(selected.value, "America/Punta_Arenas")
-        self.assertEqual(selected.label, "America/Punta Arenas")
+        self.assertEqual(selected.label, "Punta Arenas")
         self.assertIsNone(selected.description)
 
     def test_nested_timezone_is_directly_selectable_in_region(self):
@@ -152,9 +155,37 @@ class TimezonePrivacyTests(unittest.TestCase):
             if item.placeholder == "Select timezone"
         )
         option = timezone_select.options[0]
-        self.assertEqual(option.label, "America/Buenos Aires")
+        self.assertEqual(option.label, "Buenos Aires")
         self.assertIsNone(option.description)
         self.assertEqual(option.value, "America/Argentina/Buenos_Aires")
+
+    def test_saved_buenos_aires_opens_the_correct_later_page(self):
+        user = SimpleNamespace(id=111111111111111111)
+        timezones = [
+            f"America/Alpha_{index:02d}"
+            for index in range(30)
+        ] + ["America/Argentina/Buenos_Aires"]
+        with patch(
+            "modules.config.config_views.get_user_config",
+            return_value={
+                "timezone": "America/Argentina/Buenos_Aires",
+                "time_format": "12h"
+            }
+        ):
+            view = DateTimeSettingsView(
+                SimpleNamespace(owner=user),
+                timezones=timezones
+            )
+
+        self.assertEqual(view.selected_region, "America")
+        self.assertEqual(view.page, 1)
+        timezone_select = next(
+            item for item in view.children
+            if item.placeholder == "Select timezone"
+        )
+        selected = next(option for option in timezone_select.options if option.default)
+        self.assertEqual(selected.label, "Buenos Aires")
+        self.assertEqual(selected.value, "America/Argentina/Buenos_Aires")
 
     def test_zoneinfo_database_contains_expected_timezones_when_available(self):
         timezones = get_cached_timezones()
@@ -176,7 +207,11 @@ class TimezonePrivacyTests(unittest.TestCase):
         self.assertEqual(
             get_region_timezones("America", timezones),
             sorted(
-                (timezone for timezone in timezones if timezone.startswith("America/")),
+                (
+                    timezone
+                    for timezone in get_browse_timezones(timezones)
+                    if timezone.startswith("America/")
+                ),
                 key=lambda timezone: (
                     get_timezone_display(timezone)[0].lower(),
                     timezone.lower()
@@ -187,12 +222,48 @@ class TimezonePrivacyTests(unittest.TestCase):
     def test_timezone_display_flattens_to_region_and_location(self):
         self.assertEqual(
             get_timezone_display("America/Argentina/Buenos_Aires")[0],
-            "America/Buenos Aires"
+            "Buenos Aires"
         )
         self.assertEqual(
             get_timezone_display("America/Indiana/Indianapolis")[0],
-            "America/Indianapolis"
+            "Indianapolis"
         )
+
+    def test_user_facing_regions_exclude_alias_and_technical_namespaces(self):
+        regions = get_timezone_regions([
+            "America/Santiago",
+            "Chile/Continental",
+            "US/Eastern",
+            "Canada/Eastern",
+            "UTC"
+        ])
+
+        self.assertEqual(regions, ["America"])
+
+    def test_punta_arenas_santiago_and_buenos_aires_are_under_america(self):
+        timezones = get_cached_timezones()
+        america = get_region_timezones("America", timezones)
+        for timezone in (
+            "America/Punta_Arenas",
+            "America/Santiago",
+            "America/Argentina/Buenos_Aires"
+        ):
+            if timezone in timezones:
+                self.assertIn(timezone, america)
+
+    def test_saved_alias_resolves_to_canonical_geographic_timezone(self):
+        user = SimpleNamespace(id=111111111111111111)
+        timezones = ["America/Santiago", "Chile/Continental"]
+        with patch(
+            "modules.config.config_views.get_user_config",
+            return_value={"timezone": "Chile/Continental", "time_format": "12h"}
+        ):
+            view = DateTimeSettingsView(SimpleNamespace(owner=user), timezones=timezones)
+
+        self.assertEqual(get_canonical_timezone("Chile/Continental"), "America/Santiago")
+        self.assertEqual(view.saved_timezone, "Chile/Continental")
+        self.assertEqual(view.draft_timezone, "America/Santiago")
+        self.assertEqual(view.selected_region, "America")
 
     def test_timezone_pagination_exposes_every_timezone_once(self):
         user = SimpleNamespace(id=111111111111111111)
@@ -235,6 +306,27 @@ class TimezonePrivacyTests(unittest.TestCase):
                 "Santiago"
             ):
                 self.assertTrue(asyncio.run(search_timezones(search)))
+
+    def test_alias_search_returns_canonical_geographic_timezone(self):
+        timezones = ["America/Santiago", "Chile/Continental"]
+        with patch(
+            "modules.config.timezone.get_available_timezones",
+            new=AsyncMock(return_value=timezones)
+        ):
+            self.assertEqual(
+                asyncio.run(search_timezones("Chile")),
+                ["America/Santiago"]
+            )
+
+    def test_search_results_are_not_truncated_to_one_select_page(self):
+        timezones = [f"America/City_{index:02d}" for index in range(30)]
+        with patch(
+            "modules.config.timezone.get_available_timezones",
+            new=AsyncMock(return_value=timezones)
+        ):
+            results = asyncio.run(search_timezones("City"))
+
+        self.assertEqual(len(results), 30)
 
     def test_flattened_name_collisions_keep_all_canonical_values(self):
         user = SimpleNamespace(id=111111111111111111)

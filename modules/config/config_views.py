@@ -15,7 +15,8 @@ from .timezone import (
     get_timezone_option_description,
     get_timezone_regions,
     search_timezones,
-    TIMEZONE_HELP_URL
+    TIMEZONE_HELP_URL,
+    get_canonical_timezone
 )
 
 
@@ -178,12 +179,16 @@ class DateTimeSettingsView(
             "12h"
         )
         self.saved_timezone = config.get("timezone")
-        self.draft_timezone = self.saved_timezone
-        self.timezone_is_set = self.saved_timezone is not None
+        self.draft_timezone = (
+            get_canonical_timezone(self.saved_timezone)
+            if self.saved_timezone
+            else None
+        )
+        self.timezone_is_set = self.draft_timezone is not None
         self.selected_timezone = self.draft_timezone
         self.selected_region = (
-            self.saved_timezone.split("/")[0]
-            if self.saved_timezone and "/" in self.saved_timezone
+            self.draft_timezone.split("/")[0]
+            if self.draft_timezone and "/" in self.draft_timezone
             else "Other"
         )
         regions = get_timezone_regions(
@@ -191,7 +196,7 @@ class DateTimeSettingsView(
         )
         if self.selected_region not in regions:
             self.selected_region = regions[0]
-        if self.saved_timezone not in self.timezones:
+        if self.draft_timezone not in self.timezones:
             self.saved_timezone = None
             self.draft_timezone = None
             self.selected_timezone = get_region_timezones(
@@ -218,12 +223,18 @@ class DateTimeSettingsView(
             if self.timezone_is_set
             else "Not set"
         )
+        region_timezones = get_region_timezones(
+            self.selected_region,
+            self.timezones
+        )
+        total_pages = max(1, (len(region_timezones) + 24) // 25)
 
         return discord.Embed(
             title="Date & Time",
             description=(
                 f"Timezone: `{timezone}`\n"
-                f"Time format: `{self.selected_time_format}`\n\n"
+                f"Time format: `{self.selected_time_format}`\n"
+                f"{self.selected_region} - Page {self.page + 1}/{total_pages}\n\n"
                 f"Not sure which timezone is yours? Refer to "
                 f"[this guide]({TIMEZONE_HELP_URL})."
             )
@@ -249,7 +260,7 @@ class DateTimeSettingsView(
         self.add_item(self.back_settings)
 
     @discord.ui.button(
-        label="◀",
+        label="◀ Previous",
         style=discord.ButtonStyle.secondary,
         row=3
     )
@@ -266,7 +277,7 @@ class DateTimeSettingsView(
         )
 
     @discord.ui.button(
-        label="▶",
+        label="Next ▶",
         style=discord.ButtonStyle.secondary,
         row=3
     )
