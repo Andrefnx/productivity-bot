@@ -481,6 +481,8 @@ class DateTimeSettingsModal(
         self,
         interaction: discord.Interaction
     ):
+        await interaction.response.defer()
+
         timezone_search = (
             self.timezone_input.value
             .strip()
@@ -497,9 +499,9 @@ class DateTimeSettingsModal(
         )
 
         if error:
-            await interaction.response.send_message(
+            await interaction.edit_original_response(
                 error,
-                ephemeral=True
+                view=None
             )
 
             return
@@ -509,14 +511,14 @@ class DateTimeSettingsModal(
         )
 
         if not results:
-            await interaction.response.send_message(
+            await interaction.edit_original_response(
                 (
                     "Timezone not found.\n\n"
                     "Try `America/Buenos Aires`, "
                     "'New York', `Santiago` "
                     "or `Tokyo`."
                 ),
-                ephemeral=True
+                view=None
             )
 
             return
@@ -528,7 +530,7 @@ class DateTimeSettingsModal(
             search=timezone_search
         )
 
-        await interaction.response.edit_message(
+        await interaction.edit_original_response(
             embed=discord.Embed(
                 title="Choose Timezone",
                 description=(
@@ -585,6 +587,7 @@ class TimezoneResultSelect(
             self.values[0]
         )
 
+        await interaction.response.defer()
         timezones = await get_available_timezones()
         settings_view = DateTimeSettingsView(
             config_view=self.view.config_view,
@@ -604,7 +607,7 @@ class TimezoneResultSelect(
         )
         settings_view.build_components()
 
-        await interaction.response.edit_message(
+        await interaction.edit_original_response(
             embed=settings_view.create_embed(),
             view=settings_view
         )
@@ -949,12 +952,14 @@ class ConfigView(
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
+        await interaction.response.defer()
         timezones = await get_available_timezones()
 
         if not timezones:
-            await interaction.response.send_message(
-                "Timezone data is temporarily unavailable. Try again later.",
-                ephemeral=True
+            await interaction.edit_original_response(
+                content="Timezone data is temporarily unavailable. Try again later.",
+                embed=None,
+                view=self
             )
             return
 
@@ -963,7 +968,7 @@ class ConfigView(
             timezones=timezones
         )
 
-        await interaction.response.edit_message(
+        await interaction.edit_original_response(
             embed=date_time_view.create_embed(),
             view=date_time_view
         )

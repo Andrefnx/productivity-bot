@@ -8,10 +8,12 @@ from unittest.mock import AsyncMock, patch
 
 from modules.common.runtime_data import ensure_runtime_data_files
 from modules.config.config_views import (
+    ConfigView,
     DateTimeSettingsView,
     create_config_embed
 )
 from modules.config.timezone import (
+    _zoneinfo_timezones,
     get_browse_timezones,
     get_cached_timezones,
     get_canonical_timezone,
@@ -28,6 +30,79 @@ from modules.config.user.user_config import (
 
 
 class TimezonePrivacyTests(unittest.TestCase):
+    def test_date_time_defers_before_slow_timezone_loading(self):
+        user = SimpleNamespace(id=111111111111111111)
+        events = []
+
+        async def defer():
+            events.append("defer")
+
+        async def slow_timezones():
+            self.assertEqual(events, ["defer"])
+            events.append("load")
+            return ["America/Santiago"]
+
+        interaction = SimpleNamespace(
+            response=SimpleNamespace(
+                defer=AsyncMock(side_effect=defer),
+                edit_message=AsyncMock()
+            ),
+            edit_original_response=AsyncMock()
+        )
+        with patch(
+            "modules.config.config_views.get_user_config",
+            return_value=DEFAULT_CONFIG.copy()
+        ), patch(
+            "modules.config.config_views.get_available_timezones",
+            side_effect=slow_timezones
+        ):
+            view = ConfigView(user)
+            asyncio.run(view.date_time.callback(interaction))
+
+        interaction.response.defer.assert_awaited_once()
+        interaction.response.edit_message.assert_not_awaited()
+        interaction.edit_original_response.assert_awaited_once()
+        self.assertEqual(events, ["defer", "load"])
+
+    def test_date_time_empty_data_edits_deferred_response(self):
+        user = SimpleNamespace(id=111111111111111111)
+        interaction = SimpleNamespace(
+            response=SimpleNamespace(
+                defer=AsyncMock(),
+                edit_message=AsyncMock()
+            ),
+            edit_original_response=AsyncMock()
+        )
+        with patch(
+            "modules.config.config_views.get_user_config",
+            return_value=DEFAULT_CONFIG.copy()
+        ), patch(
+            "modules.config.config_views.get_available_timezones",
+            new=AsyncMock(return_value=[])
+        ):
+            view = ConfigView(user)
+            asyncio.run(view.date_time.callback(interaction))
+
+        interaction.response.defer.assert_awaited_once()
+        interaction.response.edit_message.assert_not_awaited()
+        self.assertIn(
+            "temporarily unavailable",
+            interaction.edit_original_response.await_args.kwargs["content"]
+        )
+
+    def test_zoneinfo_source_is_cached_between_calls(self):
+        _zoneinfo_timezones.cache_clear()
+        with patch(
+            "modules.config.timezone.available_timezones",
+            return_value={"America/Santiago", "Europe/Madrid"}
+        ) as available:
+            first = get_cached_timezones()
+            second = get_cached_timezones()
+
+        self.assertEqual(first, second)
+        available.assert_called_once()
+        _zoneinfo_timezones.cache_clear()
+
     def test_new_user_timezone_default_is_none(self):
         with patch(
             "modules.user_profile.profile_storage.load_profiles",

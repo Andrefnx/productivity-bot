@@ -22,14 +22,13 @@ USER_FACING_REGIONS = (
 )
 
 
+@lru_cache(maxsize=1)
 def _zoneinfo_timezones():
-    return sorted(
-        available_timezones()
-    )
+    return tuple(sorted(available_timezones()))
 
 
 def get_cached_timezones():
-    return _zoneinfo_timezones()
+    return list(_zoneinfo_timezones())
 
 
 async def get_available_timezones():
@@ -52,6 +51,7 @@ def get_timezone_links():
         return {}
 
 
+@lru_cache(maxsize=None)
 def get_canonical_timezone(timezone):
     if not timezone:
         return None
@@ -59,7 +59,7 @@ def get_canonical_timezone(timezone):
     try:
         ZoneInfo(timezone)
     except (KeyError, ValueError):
-            return timezone
+        return timezone
 
     links = get_timezone_links()
     canonical = timezone
