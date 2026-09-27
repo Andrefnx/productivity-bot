@@ -19,6 +19,7 @@ from .sprint_results import (
     close_results_registration,
     get_pending_results,
     get_sorted_results,
+    get_untracked_participants,
     send_result_reminder
 )
 from .system_messages import (
@@ -322,7 +323,8 @@ class SprintResultsView(discord.ui.View):
         if self.results_sent:
             return
         final_embed = create_results_embed(
-            get_sorted_results(self.participants)
+            get_sorted_results(self.participants),
+            get_untracked_participants(self.participants)
         )
         try:
             await self.message.channel.send(

@@ -55,6 +55,18 @@ class EntitlementTests(unittest.TestCase):
             )
             self.assertTrue(is_premium_guild("111"))
 
+    def test_approved_guild_is_premium_without_environment_override(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertTrue(
+                is_premium_guild("1508950797344440509")
+            )
+            self.assertTrue(
+                is_feature_enabled(
+                    FEATURE_BOT_CUSTOMIZATION,
+                    "1508950797344440509"
+                )
+            )
+
     def test_unknown_feature_is_disabled(self):
         self.assertFalse(is_feature_enabled("unknown", 111))
 

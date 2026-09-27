@@ -328,13 +328,16 @@ def create_empty_sprint_embed():
 # -------------------------------------------------------
 
 def create_results_embed(
-    sorted_results
+    sorted_results,
+    untracked_participants=None
 ):
     embed = discord.Embed(
         title="🏆 Sprint Results"
     )
 
-    if not sorted_results:
+    untracked_participants = untracked_participants or []
+
+    if not sorted_results and not untracked_participants:
         embed.description = no_results_message
 
         return embed
@@ -398,6 +401,17 @@ def create_results_embed(
 
         result_blocks.append(
             block
+        )
+
+    if untracked_participants:
+        untracked_blocks = [
+            f"**{sprint_user.user.display_name}**\n"
+            "No word count registered"
+            for sprint_user in untracked_participants
+        ]
+        result_blocks.append(
+            "**Participants without word count**\n"
+            + "\n\n".join(untracked_blocks)
         )
 
     embed.description = "\n\n".join(

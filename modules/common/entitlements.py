@@ -4,6 +4,10 @@ import os
 
 FEATURE_BOT_CUSTOMIZATION = "bot_customization"
 
+APPROVED_PREMIUM_GUILD_IDS = {
+    "1508950797344440509"
+}
+
 FEATURES = {
     FEATURE_BOT_CUSTOMIZATION: {
         "tier": "premium"
@@ -37,7 +41,10 @@ def is_premium_guild(guild_id):
     if guild_id is None:
         return False
 
-    return str(guild_id) in get_premium_guild_ids()
+    return (
+        str(guild_id) in get_premium_guild_ids()
+        or str(guild_id) in APPROVED_PREMIUM_GUILD_IDS
+    )
 
 
 def is_feature_enabled(feature_key, guild_id):

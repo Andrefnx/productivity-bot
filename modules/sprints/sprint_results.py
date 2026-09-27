@@ -50,6 +50,16 @@ def get_sorted_results(
     )
 
 
+def get_untracked_participants(
+    participants
+):
+    return [
+        sprint_user
+        for sprint_user in participants.get_users()
+        if not sprint_user.word_count_enabled
+    ]
+
+
 # -------------------------------------------------------
 #                  RESULTS REGISTRATION
 # -------------------------------------------------------

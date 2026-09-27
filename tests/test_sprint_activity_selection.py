@@ -2,7 +2,11 @@ import unittest
 from types import SimpleNamespace
 
 from modules.sprints.sprint_activity import ActivityProjectView
-from modules.sprints.sprint_results import get_pending_results
+from modules.sprints.sprint_results import (
+    get_pending_results,
+    get_untracked_participants
+)
+from modules.sprints.system_messages import create_results_embed
 from modules.sprints.users import (
     SprintActivityPickerView,
     SprintParticipants,
@@ -124,6 +128,44 @@ class SprintActivitySelectionTests(unittest.TestCase):
         )
 
         self.assertEqual(get_pending_results(participants), [])
+
+    def test_no_word_count_user_is_included_in_untracked_results(self):
+        participants = SprintParticipants("sprint")
+        user = SimpleNamespace(id=123)
+        participants.add_user(
+            user=user,
+            project={"project_id": "p1", "name": "Novel"},
+            initial_wc=None
+        )
+
+        self.assertEqual(
+            get_untracked_participants(participants),
+            [participants.get_user(user.id)]
+        )
+
+    def test_no_word_count_user_is_shown_without_a_rank(self):
+        ranked_user = SimpleNamespace(
+            user=SimpleNamespace(display_name="Writer"),
+            project="Novel",
+            final_wc=1200,
+            words_written=200
+        )
+        untracked_user = SimpleNamespace(
+            user=SimpleNamespace(display_name="Planner"),
+            project="Outline",
+            final_wc=None,
+            words_written=None
+        )
+
+        embed = create_results_embed(
+            [ranked_user],
+            [untracked_user]
+        )
+
+        self.assertIn("🥇 **Writer**", embed.description)
+        self.assertIn("Participants without word count", embed.description)
+        self.assertIn("**Planner**", embed.description)
+        self.assertNotIn("#2 **Planner**", embed.description)
 
 
 if __name__ == "__main__":
