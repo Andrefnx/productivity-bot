@@ -75,7 +75,10 @@ class SprintCountdownTests(unittest.TestCase):
         )
         interaction = SimpleNamespace(
             user=user,
-            response=SimpleNamespace(send_message=AsyncMock())
+            response=SimpleNamespace(
+                send_message=AsyncMock(),
+                edit_message=AsyncMock()
+            )
         )
         project = {"project_id": "project", "name": "Project", "wordcount": 0}
 
@@ -83,6 +86,8 @@ class SprintCountdownTests(unittest.TestCase):
             sprint.participants.add_user(user, project, 0)
 
         asyncio.run(sprint.leave.callback(interaction))
+        leave_view = interaction.response.send_message.await_args.kwargs["view"]
+        asyncio.run(leave_view.leave_without_saving.callback(interaction))
 
         self.assertEqual(sprint.start_timestamp, original_timestamp)
         sprint.update_current_message.assert_awaited_once()

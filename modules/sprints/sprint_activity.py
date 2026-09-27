@@ -26,6 +26,12 @@ from .system_messages import (
     create_finished_embed,
     create_results_embed
 )
+from .messages import (
+    leave_back_message,
+    leave_confirmation_message,
+    leave_progress_question_message,
+    left_message
+)
 from .users import SprintActivityPickerView
 
 
@@ -291,6 +297,107 @@ class ActivityChangeView(discord.ui.View):
     ):
         await interaction.response.edit_message(
             content="Back to sprint.",
+            embed=None,
+            view=None
+        )
+        self.stop()
+
+
+# -------------------------------------------------------
+#                   LEAVE SPRINT VIEW
+# -------------------------------------------------------
+
+def create_leave_question_text(sprint_view, sprint_user):
+    if sprint_view.started and sprint_user.word_count_enabled:
+        return leave_progress_question_message
+    return leave_confirmation_message
+
+
+class LeaveSprintView(discord.ui.View):
+    def __init__(self, sprint_view, sprint_user: SprintUser):
+        super().__init__(timeout=60)
+        self.sprint_view = sprint_view
+        self.sprint_user = sprint_user
+
+        # There is only progress to save once the sprint has started
+        # and the user is tracking words.
+        if not (sprint_view.started and sprint_user.word_count_enabled):
+            self.remove_item(self.register_and_leave)
+            self.leave_without_saving.label = "Leave"
+
+    async def interaction_check(self, interaction: discord.Interaction):
+        if interaction.user.id != self.sprint_user.user_id:
+            await interaction.response.send_message(
+                "This leave menu belongs to another user.",
+                ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(
+        label="Register & Leave",
+        style=discord.ButtonStyle.primary,
+        row=0
+    )
+    async def register_and_leave(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        modal = WordCountChangeModal(
+            initial_total=self.sprint_user.initial_wc,
+            on_validated=self.register_progress_result,
+            title="Register Progress & Leave"
+        )
+        await interaction.response.send_modal(modal)
+
+    async def register_progress_result(self, interaction, result):
+        # The sprint may have finished while the modal was open.
+        # Then remove_participant explains it and the words are
+        # registered on the results screen instead.
+        if self.sprint_view.can_leave(self.sprint_user.user_id):
+            if result.mode == "total":
+                register_previous_total(
+                    self.sprint_user,
+                    result.new_total
+                )
+            else:
+                register_previous_difference(
+                    self.sprint_user,
+                    result.difference
+                )
+
+        await self.sprint_view.remove_participant(
+            interaction,
+            content="Progress saved. " + left_message
+        )
+        self.stop()
+
+    @discord.ui.button(
+        label="Leave Without Saving",
+        style=discord.ButtonStyle.danger,
+        row=0
+    )
+    async def leave_without_saving(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await self.sprint_view.remove_participant(interaction)
+        self.stop()
+
+    @discord.ui.button(
+        label="↩ Back",
+        style=discord.ButtonStyle.secondary,
+        row=1
+    )
+    async def back(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await interaction.response.edit_message(
+            content=leave_back_message,
             embed=None,
             view=None
         )

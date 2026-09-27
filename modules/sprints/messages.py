@@ -28,6 +28,11 @@ already_joined_message = "You are already in this sprint."
 
 left_message = "You left the sprint!"
 not_joined_message = "You are not in this sprint."
+leave_confirmation_message = "Are you sure you want to leave the sprint?"
+leave_progress_question_message = (
+    "Do you want to register your progress before leaving?"
+)
+leave_back_message = "You are still in the sprint."
 
 no_participants_message = "No participants yet."
 
