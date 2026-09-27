@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 from modules.config.channel.channel_config import DEFAULT_CHANNEL_CONFIG
 from modules.config.sprint.sprint_config import DEFAULT_SPRINT_CONFIG
 from modules.sprints.active_sprint import SprintView
+from modules.sprints.sprint_activity import LeaveSprintView
 from modules.sprints.users import JoinSprintView, StartWordCountView
 
 
@@ -160,27 +161,117 @@ class SprintJoinTests(unittest.TestCase):
 
         self.assertEqual(labels, ["Custom", "No Word Count", "↩ Back"])
 
-    def test_leave_still_responds_and_removes_participant(self):
-        sprint = self.create_sprint()
-        interaction = self.create_interaction()
+    def add_participant(self, sprint, interaction, initial_wc=100):
         project = {
             "project_id": "project-1",
             "name": "Test Project",
             "wordcount": 100
         }
-        sprint.update_current_message = AsyncMock()
-
         with patch("modules.sprints.users.set_last_project"):
-            sprint.participants.add_user(interaction.user, project)
+            sprint.participants.add_user(interaction.user, project, initial_wc)
 
+    def open_leave_menu(self, sprint, interaction):
         asyncio.run(sprint.leave.callback(interaction))
+        return interaction.response.send_message.await_args.kwargs["view"]
+
+    def test_leave_asks_before_removing_participant(self):
+        sprint = self.create_sprint()
+        interaction = self.create_interaction()
+        sprint.update_current_message = AsyncMock()
+        self.add_participant(sprint, interaction)
+
+        view = self.open_leave_menu(sprint, interaction)
+
+        self.assertIsInstance(view, LeaveSprintView)
+        self.assertTrue(sprint.participants.has_user(interaction.user.id))
+        self.assertEqual(
+            interaction.response.send_message.await_args.args[0],
+            "Are you sure you want to leave the sprint?"
+        )
+        sprint.update_current_message.assert_not_awaited()
+        # Before the start there is no progress to register.
+        self.assertEqual(
+            [item.label for item in view.children],
+            ["Leave", "↩ Back"]
+        )
+
+    def test_leave_confirm_removes_participant(self):
+        sprint = self.create_sprint()
+        interaction = self.create_interaction()
+        sprint.update_current_message = AsyncMock()
+        self.add_participant(sprint, interaction)
+        view = self.open_leave_menu(sprint, interaction)
+
+        asyncio.run(view.leave_without_saving.callback(interaction))
 
         self.assertFalse(sprint.participants.has_user(interaction.user.id))
-        interaction.response.send_message.assert_awaited_once_with(
-            "You left the sprint!",
-            ephemeral=True
+        interaction.response.edit_message.assert_awaited_once_with(
+            content="You left the sprint!",
+            embed=None,
+            view=None
         )
         sprint.update_current_message.assert_awaited_once()
+
+    def test_leave_back_keeps_participant(self):
+        sprint = self.create_sprint()
+        interaction = self.create_interaction()
+        sprint.update_current_message = AsyncMock()
+        self.add_participant(sprint, interaction)
+        view = self.open_leave_menu(sprint, interaction)
+
+        asyncio.run(view.back.callback(interaction))
+
+        self.assertTrue(sprint.participants.has_user(interaction.user.id))
+        sprint.update_current_message.assert_not_awaited()
+
+    def test_leave_after_start_offers_to_register_progress(self):
+        sprint = self.create_sprint()
+        sprint.started = True
+        interaction = self.create_interaction()
+        sprint.update_current_message = AsyncMock()
+        sprint.schedule_empty_sprint_timeout = lambda: None
+        self.add_participant(sprint, interaction, initial_wc=100)
+        view = self.open_leave_menu(sprint, interaction)
+        sprint_user = sprint.participants.get_user(interaction.user.id)
+
+        self.assertEqual(
+            [item.label for item in view.children],
+            ["Register & Leave", "Leave Without Saving", "↩ Back"]
+        )
+
+        result = SimpleNamespace(mode="total", new_total=350)
+        with patch("modules.sprints.users.add_project_words") as add_words:
+            asyncio.run(view.register_progress_result(interaction, result))
+
+        add_words.assert_called_once_with(
+            user_id=interaction.user.id,
+            project_id="project-1",
+            words=250
+        )
+        self.assertEqual(sprint_user.activity_history[-1]["words_written"], 250)
+        self.assertFalse(sprint.participants.has_user(interaction.user.id))
+        interaction.response.edit_message.assert_awaited_once_with(
+            content="Progress saved. You left the sprint!",
+            embed=None,
+            view=None
+        )
+
+    def test_leave_confirm_after_sprint_finished_does_not_register(self):
+        sprint = self.create_sprint()
+        sprint.started = True
+        interaction = self.create_interaction()
+        sprint.update_current_message = AsyncMock()
+        self.add_participant(sprint, interaction)
+        view = self.open_leave_menu(sprint, interaction)
+        sprint.finished = True
+
+        result = SimpleNamespace(mode="total", new_total=350)
+        with patch("modules.sprints.users.add_project_words") as add_words:
+            asyncio.run(view.register_progress_result(interaction, result))
+
+        add_words.assert_not_called()
+        self.assertTrue(sprint.participants.has_user(interaction.user.id))
+        sprint.update_current_message.assert_not_awaited()
 
 
 if __name__ == "__main__":

@@ -43,6 +43,8 @@ from .settings import (
 )
 from .sprint_activity import (
     ActivityChangeView,
+    LeaveSprintView,
+    create_leave_question_text,
     start_results_registration
 )
 
@@ -966,11 +968,11 @@ class SprintView(
             )
             return
 
-        removed = self.participants.remove_user(
+        sprint_user = self.participants.get_user(
             interaction.user.id
         )
 
-        if not removed:
+        if sprint_user is None:
             await interaction.response.send_message(
                 not_joined_message,
                 ephemeral=True
@@ -978,14 +980,48 @@ class SprintView(
 
             return
 
-        self.participant_left()
-
+        # Leaving only asks here; LeaveSprintView calls
+        # remove_participant once the user confirms.
         await interaction.response.send_message(
-            left_message,
+            create_leave_question_text(self, sprint_user),
+            view=LeaveSprintView(
+                sprint_view=self,
+                sprint_user=sprint_user
+            ),
             ephemeral=True
         )
 
-        await self.update_current_message()
+    def can_leave(self, user_id):
+        return (
+            not self.finished
+            and self.participants.has_user(user_id)
+        )
+
+    async def remove_participant(
+        self,
+        interaction: discord.Interaction,
+        content=left_message
+    ):
+        # Re-checked on confirm: the sprint may have finished, or the
+        # user left from another menu, while the question was open.
+        removed = False
+
+        if self.finished:
+            content = already_finished_message
+        elif not self.participants.remove_user(interaction.user.id):
+            content = not_joined_message
+        else:
+            removed = True
+            self.participant_left()
+
+        await interaction.response.edit_message(
+            content=content,
+            embed=None,
+            view=None
+        )
+
+        if removed:
+            await self.update_current_message()
 
 
 # -------------------------------------------------------
