@@ -24,6 +24,7 @@ class SprintJoinTests(unittest.TestCase):
     def create_interaction(self, user_id=111111111111111111):
         response = SimpleNamespace(
             send_message=AsyncMock(),
+            send_modal=AsyncMock(),
             edit_message=AsyncMock(),
             is_done=lambda: False
         )
@@ -102,6 +103,31 @@ class SprintJoinTests(unittest.TestCase):
         self.assertEqual(
             sprint.participants.get_user(interaction.user.id).initial_wc,
             100
+        )
+        sprint.update_current_message.assert_awaited_once()
+
+    def test_leave_registers_progress_before_removing_participant(self):
+        sprint = self.create_sprint()
+        sprint.started = True
+        interaction = self.create_interaction()
+        sprint.update_current_message = AsyncMock()
+
+        with patch("modules.sprints.users.set_last_project"):
+            sprint.participants.add_user(interaction.user)
+
+        asyncio.run(sprint.leave.callback(interaction))
+
+        interaction.response.send_modal.assert_awaited_once()
+        self.assertTrue(sprint.participants.has_user(interaction.user.id))
+        modal = interaction.response.send_modal.await_args.args[0]
+        result = SimpleNamespace(mode="total", new_total=150)
+
+        asyncio.run(modal.on_validated(interaction, result))
+
+        self.assertFalse(sprint.participants.has_user(interaction.user.id))
+        interaction.response.send_message.assert_awaited_once_with(
+            "You left the sprint!",
+            ephemeral=True
         )
         sprint.update_current_message.assert_awaited_once()
 

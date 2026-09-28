@@ -455,10 +455,6 @@ async def start_results_registration(
         for sprint_user in participants.get_users()
         if sprint_user.word_count_enabled
     ]
-    mentions = " ".join(
-        sprint_user.mention
-        for sprint_user in tracked_users
-    )
 
     deadline_timestamp = int(time.time() + registration_seconds)
     results_view = SprintResultsView(
@@ -474,14 +470,8 @@ async def start_results_registration(
     )
 
     results_message = await channel.send(
-        content=mentions or None,
         embed=finished_embed,
-        view=results_view,
-        allowed_mentions=discord.AllowedMentions(
-            everyone=False,
-            users=True,
-            roles=False
-        )
+        view=results_view
     )
 
     results_view.message = results_message

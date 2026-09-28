@@ -1,7 +1,12 @@
+import asyncio
 import unittest
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock, patch
 
-from modules.sprints.sprint_activity import ActivityProjectView
+from modules.sprints.sprint_activity import (
+    ActivityProjectView,
+    start_results_registration
+)
 from modules.sprints.sprint_results import (
     get_pending_results,
     get_untracked_participants
@@ -166,6 +171,41 @@ class SprintActivitySelectionTests(unittest.TestCase):
         self.assertIn("Participants without word count", embed.description)
         self.assertIn("**Planner**", embed.description)
         self.assertNotIn("#2 **Planner**", embed.description)
+
+    def test_finished_message_keeps_mentions_inside_embed_only(self):
+        participants = SprintParticipants("sprint")
+        participants.add_user(
+            user=SimpleNamespace(id=123),
+            project=None,
+            initial_wc=0
+        )
+        channel = SimpleNamespace()
+        channel.send = AsyncMock(
+            return_value=SimpleNamespace(
+                edit=AsyncMock(),
+                channel=channel
+            )
+        )
+
+        def close_task(coroutine):
+            coroutine.close()
+            return Mock()
+
+        with patch(
+            "modules.sprints.sprint_activity.asyncio.create_task",
+            side_effect=close_task
+        ):
+            asyncio.run(
+                start_results_registration(channel, 60, participants)
+            )
+
+        message_kwargs = channel.send.await_args.kwargs
+        self.assertNotIn("content", message_kwargs)
+        self.assertNotIn("allowed_mentions", message_kwargs)
+        self.assertIn(
+            "<@123>",
+            str(message_kwargs["embed"].to_dict())
+        )
 
 
 if __name__ == "__main__":

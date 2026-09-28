@@ -17,6 +17,7 @@ from modules.config.sprint.sprint_config import create_sprint_config
 from modules.user_profile.projects import (
     create_project_picker_embed
 )
+from modules.common.ui import WordCountChangeModal
 from .messages import (
     already_finished_message,
     already_joined_message,
@@ -43,6 +44,8 @@ from .settings import (
 )
 from .sprint_activity import (
     ActivityChangeView,
+    register_previous_difference,
+    register_previous_total,
     start_results_registration
 )
 
@@ -966,16 +969,57 @@ class SprintView(
             )
             return
 
-        removed = self.participants.remove_user(
-            interaction.user.id
-        )
+        sprint_user = self.participants.get_user(interaction.user.id)
 
+        if sprint_user is None:
+            await interaction.response.send_message(
+                not_joined_message,
+                ephemeral=True
+            )
+            return
+
+        if self.started and sprint_user.word_count_enabled:
+            await interaction.response.send_modal(
+                WordCountChangeModal(
+                    initial_total=sprint_user.initial_wc,
+                    on_validated=self.leave_after_registering_progress,
+                    title="Register Current Progress"
+                )
+            )
+            return
+
+        await self.remove_participant(interaction)
+
+    async def leave_after_registering_progress(self, interaction, result):
+        if self.finished:
+            await interaction.response.send_message(
+                already_finished_message,
+                ephemeral=True
+            )
+            return
+
+        sprint_user = self.participants.get_user(interaction.user.id)
+        if sprint_user is None:
+            await interaction.response.send_message(
+                not_joined_message,
+                ephemeral=True
+            )
+            return
+
+        if result.mode == "total":
+            register_previous_total(sprint_user, result.new_total)
+        else:
+            register_previous_difference(sprint_user, result.difference)
+
+        await self.remove_participant(interaction)
+
+    async def remove_participant(self, interaction):
+        removed = self.participants.remove_user(interaction.user.id)
         if not removed:
             await interaction.response.send_message(
                 not_joined_message,
                 ephemeral=True
             )
-
             return
 
         self.participant_left()
